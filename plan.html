@@ -212,8 +212,8 @@
         </tr>
         <tr>
           <td>Michelson interface</td>
-          <td class="tbd">TBD — Phase 0 blocker</td>
-          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(TBC)</span></td>
+          <td class="tbd"><code>tezos:&lt;MICHELSON_CHAIN_ID&gt;</code> — pending fix</td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(dedicated endpoint pending)</span></td>
         </tr>
         <tr>
           <td>EVM interface</td>
@@ -251,31 +251,31 @@
           <span class="tag tag-infra">infra</span>
         </div>
       </div>
-      <span class="phase-status st-prereq">Blocker</span>
+      <span class="phase-status st-prereq">In progress</span>
     </div>
     <div class="phase-body">
       <div class="two-col">
         <div class="col-box">
-          <h4>Tasks</h4>
+          <h4>Status</h4>
           <ul>
-            <li class="block">Obtain Michelson interface chain ID on the previewnet</li>
-            <li>Verify Tezos RPC reachability (<code>/rpc/tezlink/chains/main/chain_id</code>)</li>
-            <li>Confirm whether L1 and Michelson interface share the same RPC endpoint or use separate ones</li>
-            <li>Document stable chain IDs for the duration of the POC</li>
+            <li class="check">L1 chain ID confirmed: <code>tezos:NetXH12Aer3be93</code></li>
+            <li class="check">Assumption: Michelson interface will have a distinct chain ID (different from L1)</li>
+            <li class="block">Michelson interface chain ID not yet available — known infrastructure issue</li>
+            <li class="block">Dedicated RPC endpoint for Michelson interface pending deployment</li>
           </ul>
         </div>
         <div class="col-box">
-          <h4>Derisking questions</h4>
+          <h4>Open questions</h4>
           <ul>
-            <li class="q">Does the Michelson interface expose a standard Tezos RPC endpoint?</li>
+            <li class="q">Chain ID format: genesis-hash (<code>NetX...</code>) or rollup address (<code>sr1...</code>)?</li>
+            <li class="q">Will L1 and Michelson interface share the same RPC endpoint or use separate ones?</li>
             <li class="q">Is the chain ID stable across network restarts?</li>
-            <li class="q">Is it <code>tezos:sr1...</code> (rollup address) or a genesis-hash format?</li>
           </ul>
         </div>
       </div>
-      <div class="blocker">
-        <strong>Hard dependency for all phases</strong>
-        All subsequent phases require a stable <code>chainId</code> for the Michelson interface. Until resolved, all routing logic uses a placeholder.
+      <div class="blocker" style="border-color:var(--amber); background:#1C1208; color:#FDE68A;">
+        <strong style="color:var(--amber);">Unblocked for development — placeholder in use</strong>
+        All phases use <code>&lt;MICHELSON_CHAIN_ID&gt;</code> as a placeholder. The POC proceeds with the assumption that L1 and the Michelson interface have distinct chain IDs. Placeholder will be replaced once the infrastructure issue is resolved.
       </div>
     </div>
   </div>
