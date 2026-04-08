@@ -78,6 +78,7 @@
     .p3 .phase-num { background: #064E3B; color: var(--green); border: 2px solid var(--green); }
     .p4 .phase-num { background: #134E4A; color: var(--teal); border: 2px solid var(--teal); }
     .p5 .phase-num { background: #2E1065; color: var(--purple); border: 2px solid var(--purple); }
+    .p6 .phase-num { background: #1C1917; color: #FB923C; border: 2px solid #FB923C; }
     .phase-meta { flex: 1; }
     .phase-meta h3 { font-size: 1rem; font-weight: 600; margin-bottom: .2rem; }
     .phase-meta .tagline { font-size: .85rem; color: var(--text-dim); margin-bottom: .5rem; }
@@ -89,6 +90,7 @@
     .tag-proto  { background: #451A03; color: var(--amber); }
     .tag-ux     { background: #064E3B; color: var(--green); }
     .tag-infra  { background: #1C1917; color: var(--gray); }
+    .tag-popup  { background: #431407; color: #FB923C; }
     .phase-status { flex-shrink: 0; font-size: .75rem; font-weight: 600; padding: .25rem .7rem;
                     border-radius: 100px; align-self: center; }
     .st-todo     { background: #1E293B; color: var(--text-dim); border: 1px solid var(--border); }
@@ -232,9 +234,9 @@
   <!-- Transport legend -->
   <div class="section-title">Transports covered</div>
   <div class="transport-row" style="margin-bottom:2rem;">
-    <div class="tp"><div class="tp-dot tp-post"></div> PostMessage — same-browser, zero infrastructure (Phases 1–3)</div>
-    <div class="tp"><div class="tp-dot tp-matrix"></div> Matrix P2P — cross-domain, QR pairing via Matrix homeserver (Phase 4)</div>
+    <div class="tp"><div class="tp-dot tp-matrix"></div> Matrix P2P — QR pairing via Matrix homeserver, same transport from Phase 1 to Phase 4</div>
     <div class="tp"><div class="tp-dot tp-wc2"></div> WalletConnect v2 — relay-based, CAIP multi-chain sessions (Phase 5)</div>
+    <div class="tp"><div class="tp-dot" style="background:#FB923C;"></div> Popup (PostMessage via window.open) — derisking for browser-extension-like UX (Phase 6)</div>
   </div>
 
   <!-- PHASES -->
@@ -285,50 +287,54 @@
     <div class="phase-header">
       <div class="phase-num">1</div>
       <div class="phase-meta">
-        <h3>Minimal wallet — PostMessage, single network</h3>
-        <div class="tagline">Web-based WalletClient with hard-coded test key, standard TZIP-10 protocol</div>
+        <h3>Minimal wallet — Matrix P2P, single network</h3>
+        <div class="tagline">Web wallet (Vite + @airgap/beacon-wallet + Taquito), standard TZIP-10 over Matrix</div>
         <div class="phase-tags">
-          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-proto">TZIP-10</span>
         </div>
       </div>
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Build the wallet foundation before introducing any protocol changes. Two browser tabs (dApp + wallet), PostMessage transport, no network required.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Build the wallet and dApp foundation before introducing any protocol changes. Matrix P2P is used from the start — the same transport will carry through Phases 2–4, so there is no transport switch later. The dApp generates a pairing URI; the wallet reads it and connects via a Matrix homeserver.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Deliverables</h4>
           <ul>
-            <li><code>wallet/index.html</code> — WalletClient with hard-coded Ed25519 key</li>
-            <li><code>dapp/index.html</code> — DAppClient that connects and sends a transfer</li>
-            <li>Handles <code>permission_request</code> + <code>operation_request</code> (standard)</li>
-            <li>Signs and injects an operation on Tezos L1</li>
+            <li><code>wallet/</code> — Vite app, <code>WalletClient</code>, hard-coded Ed25519 key via <code>InMemorySigner</code></li>
+            <li><code>dapp/</code> — Vite app, <code>DAppClient</code>, pairing URI + QR code display</li>
+            <li>Handles <code>permission_request</code> + <code>operation_request</code> (standard TZIP-10)</li>
+            <li>Wallet forges, signs, injects via Taquito on L1 RPC</li>
           </ul>
         </div>
         <div class="col-box">
           <h4>Derisking questions</h4>
           <ul>
-            <li class="q">Can WalletClient run in a plain HTML page without a build step?</li>
-            <li class="q">Does PostMessage pairing work across two tabs on the same origin?</li>
-            <li class="q">Which Octez.connect packages expose the wallet-side API?</li>
+            <li class="q">Which Matrix homeserver to use for the POC? (papers.tech, octez.io)</li>
+            <li class="q">Does <code>WalletClient</code> pairing via Matrix URI work without extension context?</li>
+            <li class="q">Is <code>@airgap/beacon-wallet</code> the right package, or should we use a fork?</li>
           </ul>
         </div>
       </div>
-      <pre><code><span class="cm">// wallet/index.html — core pattern</span>
+      <pre><code><span class="cm">// wallet — core pattern</span>
+<span class="kw">const</span> <span class="prop">signer</span> = <span class="kw">await</span> InMemorySigner.<span class="fn">fromSecretKey</span>(<span class="str">'edsk...'</span>);
+<span class="kw">const</span> <span class="prop">Tezos</span> = <span class="kw">new</span> <span class="fn">TezosToolkit</span>(<span class="str">'https://demo.txpark.nomadic-labs.com/rpc/tezlink'</span>);
+Tezos.<span class="fn">setSignerProvider</span>(signer);
+
 <span class="kw">const</span> <span class="prop">client</span> = <span class="kw">new</span> <span class="fn">WalletClient</span>({ <span class="prop">name</span>: <span class="str">"Tezos X Wallet POC"</span> });
 <span class="kw">await</span> client.<span class="fn">init</span>();
 
 client.<span class="fn">onPermissionRequest</span>(<span class="kw">async</span> (request) => {
-  <span class="cm">// Show UI → user approves</span>
-  <span class="kw">await</span> client.<span class="fn">approvePermissionRequest</span>(request, { <span class="prop">publicKey</span>: TEST_PUBKEY });
+  <span class="kw">await</span> client.<span class="fn">approvePermissionRequest</span>(request, { <span class="prop">publicKey</span>: <span class="kw">await</span> signer.<span class="fn">publicKey</span>() });
 });
 
 client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> (request) => {
-  <span class="cm">// Sign + inject → return op hash</span>
-  <span class="kw">await</span> client.<span class="fn">approveOperationRequest</span>(request, { <span class="prop">transactionHash</span>: hash });
+  <span class="cm">// Forge + sign + inject via Taquito, return hash</span>
+  <span class="kw">const</span> <span class="prop">op</span> = <span class="kw">await</span> Tezos.contract.<span class="fn">batch</span>(request.operationDetails).<span class="fn">send</span>();
+  <span class="kw">await</span> client.<span class="fn">approveOperationRequest</span>(request, { <span class="prop">transactionHash</span>: op.hash });
 });</code></pre>
-      <div class="outcome"><strong>Phase done when:</strong> dApp connects to wallet in two tabs, sends a tez transfer on L1, wallet signs it, operation lands on previewnet.</div>
+      <div class="outcome"><strong>Phase done when:</strong> dApp pairs with wallet via QR code, sends a tez transfer on L1, wallet signs and injects, operation lands on the txpark previewnet.</div>
     </div>
   </div>
 
@@ -340,7 +346,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <h3>TZIP-10 protocol extension</h3>
         <div class="tagline">Add <code>networks[]</code> to permission_request, <code>network</code> routing to operation_request</div>
         <div class="phase-tags">
-          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-proto">TZIP-10 delta</span>
         </div>
       </div>
@@ -397,7 +403,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <h3>UX demo — concrete use-case</h3>
         <div class="tagline">Single session, two operations, two networks — recordable for partners and wallet teams</div>
         <div class="phase-tags">
-          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-ux">UX demo</span>
         </div>
       </div>
@@ -436,8 +442,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="phase-header">
       <div class="phase-num">4</div>
       <div class="phase-meta">
-        <h3>Cross-domain deployment — Matrix P2P</h3>
-        <div class="tagline">Wallet on a cloud domain, dApp on another — real-world setup like Umami web</div>
+        <h3>Cross-domain deployment</h3>
+        <div class="tagline">Wallet on a cloud domain, dApp on another — no transport change, pure deployment</div>
         <div class="phase-tags">
           <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-infra">deployment</span>
@@ -446,29 +452,27 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">PostMessage only works within the same browser context. This phase deploys wallet and dApp to separate domains and switches to Matrix P2P transport — the path for any real web wallet (Umami, custom wallet pages). The protocol changes from Phase 2 carry over unchanged.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Matrix P2P is already the transport from Phase 1. This phase is purely a deployment change: wallet and dApp move from localhost to separate public HTTPS domains (like Umami web vs. a dApp). No protocol or transport change — the goal is to confirm the setup works in a real-world network context and surface any CORS or DoS-protection issues with the Matrix homeserver.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
           <ul>
             <li>Deploy wallet to cloud (e.g. <code>wallet.&lt;domain&gt;</code>)</li>
             <li>Deploy dApp to a separate domain</li>
-            <li>Switch Octez.connect transport to Matrix P2P</li>
-            <li>Validate QR code pairing flow end-to-end</li>
-            <li>Re-run Phase 2 multi-chain session over Matrix</li>
+            <li>Validate QR code pairing end-to-end over public internet</li>
+            <li>Re-run Phase 2 multi-chain session from separate domains</li>
           </ul>
         </div>
         <div class="col-box">
           <h4>Derisking questions</h4>
           <ul>
-            <li class="q">Which Matrix homeserver to use? (papers.tech, octez.io, or self-hosted?)</li>
-            <li class="q">Does multi-chain routing work identically over Matrix vs PostMessage?</li>
-            <li class="q">Any CORS or CSP issues with Matrix homeserver from the wallet domain?</li>
-            <li class="q">Message latency acceptable for a demo?</li>
+            <li class="q">Any CORS issues from the new wallet domain to the Matrix homeserver?</li>
+            <li class="q">Does the Matrix homeserver apply rate limiting or DoS protection that affects the POC?</li>
+            <li class="q">Message latency acceptable over public internet?</li>
           </ul>
         </div>
       </div>
-      <div class="outcome"><strong>Phase done when:</strong> Full multi-chain session works between two separate HTTPS domains via Matrix P2P. QR pairing works. Same use-case as Phase 3.</div>
+      <div class="outcome"><strong>Phase done when:</strong> Full multi-chain session works between two separate HTTPS domains. Same use-case as Phase 3, from a real deployment.</div>
     </div>
   </div>
 
@@ -529,15 +533,56 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     </div>
   </div>
 
-  <!-- Dependencies -->
-  <div class="section-title">Key dependencies</div>
+  <!-- Phase 6 -->
+  <div class="phase p6">
+    <div class="phase-header">
+      <div class="phase-num">6</div>
+      <div class="phase-meta">
+        <h3>Popup model — PostMessage via window.open</h3>
+        <div class="tagline">dApp opens wallet as a popup — derisking the browser-extension-like UX pattern</div>
+        <div class="phase-tags">
+          <span class="tag tag-popup">Popup</span>
+          <span class="tag tag-ux">UX</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">PostMessage works between a window and a popup it opened (<code>window.open</code>), because the opener holds a reference to the popup's <code>window</code> object. This is the model used by some web wallets to avoid QR code pairing. This phase validates the pattern and its UX trade-offs compared to Matrix P2P.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Tasks</h4>
+          <ul>
+            <li>dApp opens wallet URL via <code>window.open()</code></li>
+            <li>Implement PostMessage handshake between opener and popup</li>
+            <li>Route Beacon messages over the popup channel</li>
+            <li>Re-run Phase 2 multi-chain session via popup transport</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Do popup blockers interfere with <code>window.open()</code> triggered on user action?</li>
+            <li class="q">Is the Beacon SDK popup transport already implemented or does it need to be added?</li>
+            <li class="q">UX comparison: popup vs. QR code — which is more natural for a Tezos web wallet?</li>
+          </ul>
+        </div>
+      </div>
+      <div class="outcome"><strong>Phase done when:</strong> Same multi-chain use-case works with a popup wallet. UX comparison between popup and Matrix QR pairing is documented.</div>
+    </div>
+  </div>
+
+  <!-- Tech stack -->
+  <div class="section-title">Tech stack</div>
   <div class="dep-row">
-    <div class="dep">@tezos-x/octez.connect-dapp</div>
-    <div class="dep">@tezos-x/octez.connect-wallet</div>
+    <div class="dep">Vite (build tool)</div>
+    <div class="dep">@airgap/beacon-wallet</div>
+    <div class="dep">@airgap/beacon-dapp</div>
     <div class="dep">@taquito/taquito</div>
+    <div class="dep">@taquito/signer (InMemorySigner)</div>
     <div class="dep"><a href="https://walletconnect.com/sign">@walletconnect/sign-client</a></div>
     <div class="dep">Matrix homeserver (papers.tech or octez.io)</div>
-    <div class="dep">Reown relay (WC2 cloud relay)</div>
+    <div class="dep">Reown relay + Project ID</div>
     <div class="dep">Previewnet RPC (txpark)</div>
   </div>
 
