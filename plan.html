@@ -180,7 +180,7 @@
   <div class="context">
     <h2>Context</h2>
     <p>Beacon (TZIP-10) today supports a single network per session. Tezos X introduces a second runtime — the Michelson interface — that shares the same account model as Tezos L1 but lives on a separate chain. A dApp targeting Tezos X needs to operate on both chains within a single wallet session.</p>
-    <p>This POC validates the required protocol changes (Track B — TZIP-10 extension) and the wallet-side implementation across all three Beacon transports, on a real dual-runtime previewnet.</p>
+    <p>This POC validates the required protocol changes to Beacon (TZIP-10) and the wallet-side implementation across all three Beacon transports, on a real dual-runtime previewnet.</p>
   </div>
 
   <!-- Objectives -->
@@ -275,7 +275,7 @@
       </div>
       <div class="blocker">
         <strong>Hard dependency for all phases</strong>
-        Both Track A (WC2) and Track B (TZIP-10) require a stable <code>chainId</code> for the Michelson interface. Until resolved, all routing logic uses a placeholder.
+        All subsequent phases require a stable <code>chainId</code> for the Michelson interface. Until resolved, all routing logic uses a placeholder.
       </div>
     </div>
   </div>
@@ -337,7 +337,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="phase-header">
       <div class="phase-num">2</div>
       <div class="phase-meta">
-        <h3>TZIP-10 extension — Track B</h3>
+        <h3>TZIP-10 protocol extension</h3>
         <div class="tagline">Add <code>networks[]</code> to permission_request, <code>network</code> routing to operation_request</div>
         <div class="phase-tags">
           <span class="tag tag-post">PostMessage</span>
@@ -477,7 +477,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="phase-header">
       <div class="phase-num">5</div>
       <div class="phase-meta">
-        <h3>WalletConnect v2 — Track A derisking</h3>
+        <h3>WalletConnect v2 transport</h3>
         <div class="tagline">Multi-chain WC2 session with two <code>tezos:</code> chains in a single session proposal</div>
         <div class="phase-tags">
           <span class="tag tag-wc2">WalletConnect v2</span>
@@ -487,7 +487,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Track A targets WC2-native wallets (Trust Wallet, future cross-ecosystem wallets). Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — no TZIP-10 spec change. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that the multi-chain routing from Phase 2 translates correctly to CAIP-27 <code>chainId</code> routing.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets WC2-native wallets (Trust Wallet, future cross-ecosystem wallets). Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — the TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -508,7 +508,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           </ul>
         </div>
       </div>
-      <pre><code><span class="cm">// WC2 session proposal — Track A</span>
+      <pre><code><span class="cm">// WC2 session proposal</span>
 {
   <span class="prop">requiredNamespaces</span>: {
     <span class="prop">tezos</span>: {
