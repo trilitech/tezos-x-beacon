@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beacon Multi-chain POC — Development Plan</title>
+  <style>
+    :root {
+      --bg: #0F172A; --surface: #1E293B; --surface2: #273548;
+      --border: #334155; --border-light: #3E4F65;
+      --blue: #3B82F6; --blue-dim: #1D4ED8; --blue-light: #EFF6FF;
+      --teal: #2DD4BF; --teal-dim: #0D9488;
+      --amber: #F59E0B; --amber-dim: #92400E;
+      --green: #10B981; --green-dim: #065F46;
+      --red: #EF4444; --red-dim: #991B1B;
+      --purple: #A78BFA; --purple-dim: #5B21B6;
+      --gray: #94A3B8; --text: #E2E8F0; --text-dim: #94A3B8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); line-height: 1.7; }
+
+    /* Layout */
+    header { background: linear-gradient(135deg, #3B1F6E 0%, #0F172A 100%);
+             padding: 3rem 2rem 2rem; border-bottom: 1px solid var(--border); }
+    header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.4rem; }
+    header p { color: var(--text-dim); font-size: 1rem; max-width: 700px; margin-bottom: 1rem; }
+    .meta { font-size: 0.8rem; color: var(--text-dim); }
+    .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .06em; padding: .2rem .6rem; border-radius: 100px; margin-right: .4rem; }
+    .badge-purple { background: var(--purple-dim); color: var(--purple); }
+    .badge-amber  { background: #451A03; color: var(--amber); }
+    .badge-blue   { background: #1E3A5F; color: var(--blue); }
+
+    main { max-width: 960px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+    /* Section headers */
+    .section-title { font-size: 1.05rem; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .06em; color: var(--text-dim); margin: 2.5rem 0 1rem;
+                     padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+
+    /* Context box */
+    .context { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+               padding: 1.5rem; margin-bottom: 2rem; }
+    .context h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: .75rem; }
+    .context p { color: var(--text-dim); font-size: .9rem; margin-bottom: .5rem; }
+    .context p:last-child { margin-bottom: 0; }
+
+    /* Objectives */
+    .obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+    .obj { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+           padding: 1.25rem; }
+    .obj-num { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--text-dim); margin-bottom: .4rem; }
+    .obj h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .5rem; }
+    .obj p { font-size: .875rem; color: var(--text-dim); }
+
+    /* Transport legend */
+    .transport-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .tp { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--text-dim); }
+    .tp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .tp-post { background: var(--blue); }
+    .tp-matrix { background: var(--teal); }
+    .tp-wc2 { background: var(--purple); }
+
+    /* Phase cards */
+    .phase { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+             margin-bottom: 1.25rem; overflow: hidden; }
+    .phase-header { display: flex; align-items: flex-start; gap: 1rem; padding: 1.25rem 1.5rem;
+                    cursor: pointer; user-select: none; }
+    .phase-header:hover { background: var(--surface2); }
+    .phase-num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+                 display: flex; align-items: center; justify-content: center;
+                 font-size: .85rem; font-weight: 700; }
+    .p0 .phase-num { background: #1C1917; color: var(--amber); border: 2px solid var(--amber); }
+    .p1 .phase-num { background: #1E2D45; color: var(--blue); border: 2px solid var(--blue); }
+    .p2 .phase-num { background: #1E2D45; color: var(--blue); border: 2px solid var(--blue); }
+    .p3 .phase-num { background: #064E3B; color: var(--green); border: 2px solid var(--green); }
+    .p4 .phase-num { background: #134E4A; color: var(--teal); border: 2px solid var(--teal); }
+    .p5 .phase-num { background: #2E1065; color: var(--purple); border: 2px solid var(--purple); }
+    .phase-meta { flex: 1; }
+    .phase-meta h3 { font-size: 1rem; font-weight: 600; margin-bottom: .2rem; }
+    .phase-meta .tagline { font-size: .85rem; color: var(--text-dim); margin-bottom: .5rem; }
+    .phase-tags { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .tag { font-size: .7rem; font-weight: 600; padding: .15rem .5rem; border-radius: 4px; }
+    .tag-post   { background: #1E3A5F; color: var(--blue); }
+    .tag-matrix { background: #134E4A; color: var(--teal); }
+    .tag-wc2    { background: #2E1065; color: var(--purple); }
+    .tag-proto  { background: #451A03; color: var(--amber); }
+    .tag-ux     { background: #064E3B; color: var(--green); }
+    .tag-infra  { background: #1C1917; color: var(--gray); }
+    .phase-status { flex-shrink: 0; font-size: .75rem; font-weight: 600; padding: .25rem .7rem;
+                    border-radius: 100px; align-self: center; }
+    .st-todo     { background: #1E293B; color: var(--text-dim); border: 1px solid var(--border); }
+    .st-prereq   { background: #451A03; color: var(--amber); }
+    .st-progress { background: #1E3A5F; color: var(--blue); }
+    .st-done     { background: #064E3B; color: var(--green); }
+
+    .phase-body { padding: 0 1.5rem 1.5rem; border-top: 1px solid var(--border); }
+
+    /* Two-col grid inside phase */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
+    .col-box { background: var(--surface2); border: 1px solid var(--border-light);
+               border-radius: 8px; padding: 1rem 1.25rem; }
+    .col-box h4 { font-size: .8rem; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: .05em; color: var(--text-dim); margin-bottom: .75rem; }
+    .col-box ul { list-style: none; padding: 0; }
+    .col-box li { font-size: .875rem; color: var(--text-dim); padding: .25rem 0;
+                  border-bottom: 1px solid var(--border); display: flex; gap: .5rem; align-items: flex-start; }
+    .col-box li:last-child { border-bottom: none; }
+    .col-box li::before { content: "→"; color: var(--border-light); flex-shrink: 0; margin-top: .05rem; }
+    .col-box li.check::before { content: "✓"; color: var(--green); }
+    .col-box li.block::before { content: "⊘"; color: var(--red); }
+    .col-box li.q::before { content: "?"; color: var(--amber); font-weight: 700; }
+
+    /* Outcome callout */
+    .outcome { margin-top: 1.25rem; background: var(--surface2); border-left: 3px solid var(--green);
+               border-radius: 0 8px 8px 0; padding: .75rem 1rem; font-size: .875rem; }
+    .outcome strong { color: var(--green); }
+
+    /* Blocker callout */
+    .blocker { margin-top: 1.25rem; background: #1C0505; border-left: 3px solid var(--red);
+               border-radius: 0 8px 8px 0; padding: .75rem 1rem; font-size: .875rem; color: #FCA5A5; }
+    .blocker strong { color: var(--red); display: block; margin-bottom: .25rem; }
+
+    /* Code */
+    pre { background: #0D1117; border: 1px solid var(--border); border-radius: 8px;
+          padding: 1rem 1.25rem; font-size: .8rem; overflow-x: auto; margin-top: 1rem; line-height: 1.6; }
+    code { font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; }
+    pre code { color: #E5E7EB; }
+    .kw { color: #C792EA; } .str { color: #C3E88D; } .cm { color: #546E7A; }
+    .fn { color: #82AAFF; } .prop { color: #FFCB6B; }
+
+    /* Network info box */
+    .net-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+               padding: 1.25rem; margin-bottom: 2rem; }
+    .net-box h3 { font-size: .9rem; font-weight: 700; color: var(--text-dim); margin-bottom: .75rem;
+                  text-transform: uppercase; letter-spacing: .05em; }
+    .net-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .net-table th { text-align: left; padding: .4rem .75rem; color: var(--text-dim);
+                    border-bottom: 1px solid var(--border); font-weight: 600; font-size: .75rem;
+                    text-transform: uppercase; letter-spacing: .05em; }
+    .net-table td { padding: .4rem .75rem; border-bottom: 1px solid var(--border);
+                    color: var(--text-dim); }
+    .net-table td code { font-size: .8rem; color: var(--text); background: var(--surface2);
+                         padding: .1rem .35rem; border-radius: 3px; }
+    .net-table tr:last-child td { border-bottom: none; }
+    .tbd { color: var(--amber) !important; font-style: italic; }
+
+    /* Dependencies */
+    .dep-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .dep { font-size: .8rem; padding: .2rem .6rem; border-radius: 4px;
+           background: var(--surface2); border: 1px solid var(--border-light); color: var(--text-dim); }
+    .dep a { color: inherit; text-decoration: none; }
+    .dep a:hover { color: var(--blue); }
+
+    footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem;
+             text-align: center; font-size: .8rem; color: var(--text-dim); }
+
+    @media (max-width: 640px) {
+      .obj-grid, .two-col { grid-template-columns: 1fr; }
+      header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="badge badge-purple">POC</span>
+  <span class="badge badge-amber">In progress</span>
+  <span class="badge badge-blue">Tezos X</span>
+  <h1>Beacon Multi-chain — Development Plan</h1>
+  <p>Proof of concept for extending Beacon / Octez.connect to support single-session multi-chain operations across Tezos L1 and the Michelson interface of Tezos X. Covers three transports: PostMessage, Matrix P2P, and WalletConnect v2.</p>
+  <p class="meta">April 2026 &middot; Tezos X Adoption Team</p>
+</header>
+
+<main>
+
+  <!-- Context -->
+  <div class="context">
+    <h2>Context</h2>
+    <p>Beacon (TZIP-10) today supports a single network per session. Tezos X introduces a second runtime — the Michelson interface — that shares the same account model as Tezos L1 but lives on a separate chain. A dApp targeting Tezos X needs to operate on both chains within a single wallet session.</p>
+    <p>This POC validates the required protocol changes (Track B — TZIP-10 extension) and the wallet-side implementation across all three Beacon transports, on a real dual-runtime previewnet.</p>
+  </div>
+
+  <!-- Objectives -->
+  <div class="section-title">Objectives</div>
+  <div class="obj-grid">
+    <div class="obj">
+      <div class="obj-num">Objective 1</div>
+      <h3>UX demonstration</h3>
+      <p>Show what single-session multi-chain UX looks like for a user: one pairing, one approval screen, operations on both L1 and the Michelson interface without re-connecting.</p>
+    </div>
+    <div class="obj">
+      <div class="obj-num">Objective 2</div>
+      <h3>Protocol change demonstration</h3>
+      <p>Show the concrete delta to the Beacon/TZIP-10 protocol — the <code>networks</code> array on <code>permission_request</code>, explicit <code>network</code> routing on <code>operation_request</code> — and prove backward compatibility.</p>
+    </div>
+  </div>
+
+  <!-- Test network -->
+  <div class="section-title">Test network</div>
+  <div class="net-box">
+    <h3>Private previewnet (txpark)</h3>
+    <table class="net-table">
+      <thead><tr><th>Interface</th><th>Chain ID</th><th>RPC</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Tezos L1</td>
+          <td><code>tezos:NetXH12Aer3be93</code></td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code></td>
+        </tr>
+        <tr>
+          <td>Michelson interface</td>
+          <td class="tbd">TBD — Phase 0 blocker</td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(TBC)</span></td>
+        </tr>
+        <tr>
+          <td>EVM interface</td>
+          <td><code>eip155:127124</code></td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:.75rem; font-size:.8rem; color:var(--text-dim);">
+      Portal: <code>https://demo.txpark.nomadic-labs.com/</code> &nbsp;·&nbsp;
+      Blockscout: <code>https://demo-blockscout.txpark.nomadic-labs.com</code> &nbsp;·&nbsp;
+      Faucet: <code>https://demo-faucet.txpark.nomadic-labs.com</code>
+    </div>
+  </div>
+
+  <!-- Transport legend -->
+  <div class="section-title">Transports covered</div>
+  <div class="transport-row" style="margin-bottom:2rem;">
+    <div class="tp"><div class="tp-dot tp-post"></div> PostMessage — same-browser, zero infrastructure (Phases 1–3)</div>
+    <div class="tp"><div class="tp-dot tp-matrix"></div> Matrix P2P — cross-domain, QR pairing via Matrix homeserver (Phase 4)</div>
+    <div class="tp"><div class="tp-dot tp-wc2"></div> WalletConnect v2 — relay-based, CAIP multi-chain sessions (Phase 5)</div>
+  </div>
+
+  <!-- PHASES -->
+  <div class="section-title">Phases</div>
+
+  <!-- Phase 0 -->
+  <div class="phase p0">
+    <div class="phase-header">
+      <div class="phase-num">0</div>
+      <div class="phase-meta">
+        <h3>Network prerequisites</h3>
+        <div class="tagline">Unblock chain ID and RPC connectivity for the Michelson interface</div>
+        <div class="phase-tags">
+          <span class="tag tag-infra">infra</span>
+        </div>
+      </div>
+      <span class="phase-status st-prereq">Blocker</span>
+    </div>
+    <div class="phase-body">
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Tasks</h4>
+          <ul>
+            <li class="block">Obtain Michelson interface chain ID on the previewnet</li>
+            <li>Verify Tezos RPC reachability (<code>/rpc/tezlink/chains/main/chain_id</code>)</li>
+            <li>Confirm whether L1 and Michelson interface share the same RPC endpoint or use separate ones</li>
+            <li>Document stable chain IDs for the duration of the POC</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Does the Michelson interface expose a standard Tezos RPC endpoint?</li>
+            <li class="q">Is the chain ID stable across network restarts?</li>
+            <li class="q">Is it <code>tezos:sr1...</code> (rollup address) or a genesis-hash format?</li>
+          </ul>
+        </div>
+      </div>
+      <div class="blocker">
+        <strong>Hard dependency for all phases</strong>
+        Both Track A (WC2) and Track B (TZIP-10) require a stable <code>chainId</code> for the Michelson interface. Until resolved, all routing logic uses a placeholder.
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 1 -->
+  <div class="phase p1">
+    <div class="phase-header">
+      <div class="phase-num">1</div>
+      <div class="phase-meta">
+        <h3>Minimal wallet — PostMessage, single network</h3>
+        <div class="tagline">Web-based WalletClient with hard-coded test key, standard TZIP-10 protocol</div>
+        <div class="phase-tags">
+          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-proto">TZIP-10</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Build the wallet foundation before introducing any protocol changes. Two browser tabs (dApp + wallet), PostMessage transport, no network required.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Deliverables</h4>
+          <ul>
+            <li><code>wallet/index.html</code> — WalletClient with hard-coded Ed25519 key</li>
+            <li><code>dapp/index.html</code> — DAppClient that connects and sends a transfer</li>
+            <li>Handles <code>permission_request</code> + <code>operation_request</code> (standard)</li>
+            <li>Signs and injects an operation on Tezos L1</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Can WalletClient run in a plain HTML page without a build step?</li>
+            <li class="q">Does PostMessage pairing work across two tabs on the same origin?</li>
+            <li class="q">Which Octez.connect packages expose the wallet-side API?</li>
+          </ul>
+        </div>
+      </div>
+      <pre><code><span class="cm">// wallet/index.html — core pattern</span>
+<span class="kw">const</span> <span class="prop">client</span> = <span class="kw">new</span> <span class="fn">WalletClient</span>({ <span class="prop">name</span>: <span class="str">"Tezos X Wallet POC"</span> });
+<span class="kw">await</span> client.<span class="fn">init</span>();
+
+client.<span class="fn">onPermissionRequest</span>(<span class="kw">async</span> (request) => {
+  <span class="cm">// Show UI → user approves</span>
+  <span class="kw">await</span> client.<span class="fn">approvePermissionRequest</span>(request, { <span class="prop">publicKey</span>: TEST_PUBKEY });
+});
+
+client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> (request) => {
+  <span class="cm">// Sign + inject → return op hash</span>
+  <span class="kw">await</span> client.<span class="fn">approveOperationRequest</span>(request, { <span class="prop">transactionHash</span>: hash });
+});</code></pre>
+      <div class="outcome"><strong>Phase done when:</strong> dApp connects to wallet in two tabs, sends a tez transfer on L1, wallet signs it, operation lands on previewnet.</div>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase p2">
+    <div class="phase-header">
+      <div class="phase-num">2</div>
+      <div class="phase-meta">
+        <h3>TZIP-10 extension — Track B</h3>
+        <div class="tagline">Add <code>networks[]</code> to permission_request, <code>network</code> routing to operation_request</div>
+        <div class="phase-tags">
+          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-proto">TZIP-10 delta</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Core protocol change. Extend the Beacon message format, implement on both sides, validate backward compatibility with an unpatched wallet.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Protocol delta</h4>
+          <ul>
+            <li>Add <code>networks: NetworkInfo[]</code> to <code>permission_request</code></li>
+            <li>Wallet responds with accounts indexed per network</li>
+            <li>Add optional <code>network: string</code> to <code>operation_request</code></li>
+            <li>Defaults to session primary network if absent (backward compat)</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Does an unpatched wallet silently ignore <code>networks</code> or error?</li>
+            <li class="q">What happens if the wallet approves only a subset of requested networks?</li>
+            <li class="q">Is the <code>network</code> field on <code>operation_request</code> sufficient or does the dApp need a separate per-network client?</li>
+          </ul>
+        </div>
+      </div>
+      <pre><code><span class="cm">// permission_request — extended format</span>
+{
+  <span class="prop">type</span>: <span class="str">"permission_request"</span>,
+  <span class="prop">network</span>: { <span class="prop">type</span>: <span class="str">"mainnet"</span> },        <span class="cm">// kept for backward compat</span>
+  <span class="prop">networks</span>: [                              <span class="cm">// new field</span>
+    { <span class="prop">type</span>: <span class="str">"mainnet"</span> },
+    { <span class="prop">type</span>: <span class="str">"custom"</span>, <span class="prop">name</span>: <span class="str">"Michelson interface"</span>,
+      <span class="prop">rpcUrl</span>: <span class="str">"https://demo.txpark.nomadic-labs.com/rpc/tezlink"</span>,
+      <span class="prop">chainId</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span> }
+  ],
+  <span class="prop">scopes</span>: [<span class="str">"operation_request"</span>]
+}
+
+<span class="cm">// operation_request — with explicit routing</span>
+<span class="kw">await</span> dAppClient.<span class="fn">requestOperation</span>({
+  <span class="prop">network</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span>,   <span class="cm">// new optional field</span>
+  <span class="prop">operationDetails</span>: [...]
+});</code></pre>
+      <div class="outcome"><strong>Phase done when:</strong> dApp sends two operations in the same session — one to L1, one to Michelson interface — wallet routes correctly to each, and an unpatched wallet still works with the old single-network flow.</div>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase p3">
+    <div class="phase-header">
+      <div class="phase-num">3</div>
+      <div class="phase-meta">
+        <h3>UX demo — concrete use-case</h3>
+        <div class="tagline">Single session, two operations, two networks — recordable for partners and wallet teams</div>
+        <div class="phase-tags">
+          <span class="tag tag-post">PostMessage</span>
+          <span class="tag tag-ux">UX demo</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Polish the wallet UI and the dApp for a concrete, demo-ready use-case. The goal is a 2-minute screen recording that wallet teams can watch to understand what they need to implement.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Use-case</h4>
+          <ul>
+            <li>User opens dApp, clicks "Connect"</li>
+            <li>Wallet shows: approve access to L1 <em>and</em> Michelson interface</li>
+            <li>User approves once</li>
+            <li>dApp executes a tez transfer on L1 → wallet signs</li>
+            <li>dApp calls a contract on Michelson interface → wallet signs</li>
+            <li>Both transactions confirmed in the same session</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Polished wallet UI (network selector, operation preview)</li>
+            <li>dApp with the concrete use-case flow</li>
+            <li>Screen recording of the full UX</li>
+            <li>Annotations showing the protocol messages exchanged</li>
+          </ul>
+        </div>
+      </div>
+      <div class="outcome"><strong>Phase done when:</strong> Shareable demo recording exists. A wallet engineer watching it understands exactly what they need to implement to support multi-chain sessions.</div>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="phase p4">
+    <div class="phase-header">
+      <div class="phase-num">4</div>
+      <div class="phase-meta">
+        <h3>Cross-domain deployment — Matrix P2P</h3>
+        <div class="tagline">Wallet on a cloud domain, dApp on another — real-world setup like Umami web</div>
+        <div class="phase-tags">
+          <span class="tag tag-matrix">Matrix P2P</span>
+          <span class="tag tag-infra">deployment</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">PostMessage only works within the same browser context. This phase deploys wallet and dApp to separate domains and switches to Matrix P2P transport — the path for any real web wallet (Umami, custom wallet pages). The protocol changes from Phase 2 carry over unchanged.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Tasks</h4>
+          <ul>
+            <li>Deploy wallet to cloud (e.g. <code>wallet.&lt;domain&gt;</code>)</li>
+            <li>Deploy dApp to a separate domain</li>
+            <li>Switch Octez.connect transport to Matrix P2P</li>
+            <li>Validate QR code pairing flow end-to-end</li>
+            <li>Re-run Phase 2 multi-chain session over Matrix</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Which Matrix homeserver to use? (papers.tech, octez.io, or self-hosted?)</li>
+            <li class="q">Does multi-chain routing work identically over Matrix vs PostMessage?</li>
+            <li class="q">Any CORS or CSP issues with Matrix homeserver from the wallet domain?</li>
+            <li class="q">Message latency acceptable for a demo?</li>
+          </ul>
+        </div>
+      </div>
+      <div class="outcome"><strong>Phase done when:</strong> Full multi-chain session works between two separate HTTPS domains via Matrix P2P. QR pairing works. Same use-case as Phase 3.</div>
+    </div>
+  </div>
+
+  <!-- Phase 5 -->
+  <div class="phase p5">
+    <div class="phase-header">
+      <div class="phase-num">5</div>
+      <div class="phase-meta">
+        <h3>WalletConnect v2 — Track A derisking</h3>
+        <div class="tagline">Multi-chain WC2 session with two <code>tezos:</code> chains in a single session proposal</div>
+        <div class="phase-tags">
+          <span class="tag tag-wc2">WalletConnect v2</span>
+          <span class="tag tag-proto">CAIP-25</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Track A targets WC2-native wallets (Trust Wallet, future cross-ecosystem wallets). Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — no TZIP-10 spec change. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that the multi-chain routing from Phase 2 translates correctly to CAIP-27 <code>chainId</code> routing.</p>
+      <div class="two-col">
+        <div class="col-box">
+          <h4>Tasks</h4>
+          <ul>
+            <li>Patch <code>WalletConnectCommunicationClient</code> to include both chains in session proposal</li>
+            <li>Extend wallet to handle WC2 session with two <code>tezos:</code> namespaces</li>
+            <li>Map <code>operation_request.network</code> → <code>wc_sessionRequest.chainId</code></li>
+            <li>Validate with Reown relay (cloud WC2 relay)</li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Does the Reown relay accept a session with two chains in the same <code>tezos</code> namespace?</li>
+            <li class="q">Does the WC2 protocol enforce account-per-chain in the session response?</li>
+            <li class="q">Any rate limits or relay policy issues with a <code>tezos:</code> namespace for a non-mainnet chain?</li>
+            <li class="q">Is a CAIP-25 profile update needed for the Tezos namespace to be accepted?</li>
+          </ul>
+        </div>
+      </div>
+      <pre><code><span class="cm">// WC2 session proposal — Track A</span>
+{
+  <span class="prop">requiredNamespaces</span>: {
+    <span class="prop">tezos</span>: {
+      <span class="prop">chains</span>: [<span class="str">"tezos:NetXH12Aer3be93"</span>],   <span class="cm">// L1</span>
+      <span class="prop">methods</span>: [<span class="str">"tezos_getAccounts"</span>, <span class="str">"tezos_send"</span>, <span class="str">"tezos_sign"</span>],
+      <span class="prop">events</span>: []
+    }
+  },
+  <span class="prop">optionalNamespaces</span>: {
+    <span class="prop">tezos</span>: {
+      <span class="prop">chains</span>: [<span class="str">"tezos:&lt;MICHELSON_CHAIN_ID&gt;"</span>],  <span class="cm">// Michelson interface</span>
+      <span class="prop">methods</span>: [<span class="str">"tezos_getAccounts"</span>, <span class="str">"tezos_send"</span>, <span class="str">"tezos_sign"</span>],
+      <span class="prop">events</span>: []
+    }
+  }
+}</code></pre>
+      <div class="outcome"><strong>Phase done when:</strong> A WC2 session spanning both <code>tezos:</code> chains is established via Reown relay, and <code>tezos_send</code> is correctly dispatched to each chain via <code>chainId</code> routing.</div>
+    </div>
+  </div>
+
+  <!-- Dependencies -->
+  <div class="section-title">Key dependencies</div>
+  <div class="dep-row">
+    <div class="dep">@tezos-x/octez.connect-dapp</div>
+    <div class="dep">@tezos-x/octez.connect-wallet</div>
+    <div class="dep">@taquito/taquito</div>
+    <div class="dep"><a href="https://walletconnect.com/sign">@walletconnect/sign-client</a></div>
+    <div class="dep">Matrix homeserver (papers.tech or octez.io)</div>
+    <div class="dep">Reown relay (WC2 cloud relay)</div>
+    <div class="dep">Previewnet RPC (txpark)</div>
+  </div>
+
+</main>
+
+<footer>
+  Tezos X Beacon Multi-chain POC &middot; April 2026 &middot; Internal
+</footer>
+
+</body>
+</html>
