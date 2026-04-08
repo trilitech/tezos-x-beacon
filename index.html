@@ -258,7 +258,7 @@
       <ul>
         <li>Launched with env flag or URL param: <code>?headless=1</code></li>
         <li>Auto-approves all <code>permission_request</code> and <code>operation_request</code></li>
-        <li>Exposes a control API on <code>http://localhost:&lt;WALLET_PORT&gt;</code></li>
+        <li>Exposes a control API on <code>http://localhost:&lt;WALLET_PORT&gt;</code> — <strong>dev/test only, never built into production</strong></li>
         <li><code>GET /pairing-uri</code> — returns the Matrix pairing URI as plain text</li>
         <li><code>GET /last-op</code> — returns the last <code>transactionHash</code> returned to dApp</li>
         <li><code>POST /reset</code> — clears session state between tests</li>
@@ -427,15 +427,16 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <h4>Protocol delta</h4>
           <ul>
             <li>Add <code>networks: NetworkInfo[]</code> to <code>permission_request</code></li>
-            <li>Wallet responds with accounts indexed per network</li>
-            <li>Add optional <code>network: string</code> to <code>operation_request</code></li>
-            <li>Defaults to session primary network if absent (backward compat)</li>
+            <li>Wallet responds with accounts indexed per network in <code>permission_response</code></li>
+            <li><strong>Capability detection</strong>: dApp checks if response contains accounts for multiple networks — if yes, multi-chain mode active</li>
+            <li>Add <code>network: string</code> to <code>operation_request</code> — <strong>required</strong> in multi-chain mode, absent in legacy single-network mode</li>
+            <li>No "primary network" concept — two clean modes, no ambiguity</li>
           </ul>
         </div>
         <div class="col-box">
           <h4>Derisking questions</h4>
           <ul>
-            <li class="q">Does an unpatched wallet silently ignore <code>networks</code> or error?</li>
+            <li class="check">Backward compat (unpatched wallet ignores <code>networks</code>) — validated in Phase 1</li>
             <li class="q">What happens if the wallet approves only a subset of requested networks?</li>
             <li class="q">Is the <code>network</code> field on <code>operation_request</code> sufficient or does the dApp need a separate per-network client?</li>
           </ul>
@@ -454,18 +455,21 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
   <span class="prop">scopes</span>: [<span class="str">"operation_request"</span>]
 }
 
-<span class="cm">// operation_request — with explicit routing</span>
+<span class="cm">// operation_request — network required in multi-chain mode</span>
 <span class="kw">await</span> dAppClient.<span class="fn">requestOperation</span>({
-  <span class="prop">network</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span>,   <span class="cm">// new optional field</span>
+  <span class="prop">network</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span>,   <span class="cm">// required when session is multi-chain</span>
   <span class="prop">operationDetails</span>: [...]
-});</code></pre>
+});
+
+<span class="cm">// legacy single-network — unchanged, network field absent</span>
+<span class="kw">await</span> dAppClient.<span class="fn">requestOperation</span>({ <span class="prop">operationDetails</span>: [...] });</code></pre>
       <div class="outcome"><strong>Phase done when:</strong> dApp sends two operations in the same session — one to L1, one to Michelson interface — wallet routes correctly to each, and an unpatched wallet still works with the old single-network flow.</div>
       <div class="e2e">
         <h4>E2E validation — <code>test/phase2.ts</code></h4>
         <ol>
           <li><code>requestPermissions({ networks: [L1, Michelson] })</code> → response contains accounts for both chain IDs</li>
           <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves; <code>GET /chains/main/blocks/head/operations/3</code> on L1 RPC contains hash</li>
-          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hash, MICHELSON_RPC)</code> resolves; confirmed on Michelson RPC</li>
+          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → wallet routes to Michelson endpoint; <em>note: while using the fake chain ID (<code>tezos:NetXfakechain1111</code>), this validates routing logic only — the RPC endpoint is still L1. Full multi-chain execution on a real separate chain requires the infrastructure fix (Phase 3).</em></li>
           <li><code>requestOperation({/* no network */})</code> → resolves without error, confirmed on L1 (default)</li>
           <li><strong>Backward compat</strong>: repeat test against unpatched <code>@airgap/beacon-wallet</code> → <code>requestPermissions()</code> resolves with single-network account, no exception thrown</li>
         </ol>
@@ -587,7 +591,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets WC2-native wallets (Trust Wallet, future cross-ecosystem wallets). Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — the TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — the TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing. The POC uses the demo wallet to validate the protocol before engaging real wallet teams.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -654,7 +658,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">PostMessage works between a window and a popup it opened (<code>window.open</code>), because the opener holds a reference to the popup's <code>window</code> object. This is the model used by some web wallets to avoid QR code pairing. This phase validates the pattern and its UX trade-offs compared to Matrix P2P.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Beacon already has a PostMessage transport for browser extensions. This phase extends that transport to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works without any new transport layer. No new transport is introduced — existing Beacon PostMessage code is extended. This phase validates the pattern and its UX trade-offs compared to Matrix P2P.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
