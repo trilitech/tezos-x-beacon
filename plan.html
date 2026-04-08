@@ -227,7 +227,7 @@
         <tr>
           <td>Michelson interface</td>
           <td class="tbd"><code>tezos:&lt;MICHELSON_CHAIN_ID&gt;</code> — pending fix</td>
-          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(dedicated endpoint pending)</span></td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(dedicated endpoint pending)</span> — <em>Phase 2 : <code>rpcUrl</code> dans <code>networks[]</code> pointe vers <code>http://localhost:9998/tezlink</code> (proxy local), pas vers txpark</em></td>
         </tr>
         <tr>
           <td>EVM interface</td>
@@ -305,7 +305,7 @@
   <div class="col-box" style="margin-bottom:2rem;">
     <h4>Shared helper: <code>waitForConfirmation(hash, rpcUrl)</code></h4>
     <ul>
-      <li>Polls <code>GET /chains/main/blocks/head/operation_hashes</code> every 2s — response is a 4-element nested array (one per validation pass); helper flattens with <code>.flat().includes(hash)</code> before resolving</li>
+      <li>Polls <code>GET /chains/main/blocks/head/operations/${i}</code> for passes 0–3 every 2s (same pattern as the Phase 1 assertion) — flattens all 4 pass arrays with <code>.flat().find(o =&gt; o.hash === hash)</code>; resolves when the operation is found</li>
       <li>Timeout after 60s → test fails</li>
       <li>Returns block level on success</li>
     </ul>
@@ -679,12 +679,12 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <ul>
             <li class="block"><strong>Design decision — gate avant Phase 5 :</strong> le flow 3 étapes (permission v2 → version_upgrade_request → permission v3) s'applique à Matrix et PostMessage parce qu'une session est déjà établie avant l'upgrade. En WC2 il n'y a pas de "session v2 d'abord" — la session proposal WC2 <em>est</em> le premier message, et les namespaces sont négociés atomiquement. Deux options à décider :
               <ul style="margin:.4rem 0 .4rem 1.2rem; font-size:.85rem; color:var(--text-dim);">
-                <li><strong>Option A — WC2 natif :</strong> session proposal inclut L1 en <code>requiredNamespaces</code> et Michelson en <code>optionalNamespaces</code>. Si le wallet approuve Michelson → session multi-chain établie. Ensuite les messages Beacon v3 (avec <code>version_upgrade_request</code> puis <code>permission_request v3</code>) transitent dans le canal WC2 établi. Le WC2 gère la négociation multi-chain ; Beacon gère le protocole d'opération. <em>Attention :</em> un wallet v3 partial qui approuve seulement L1 donne une session WC2 valid avec length-1 — le dApp doit tester <code>chains.includes(MICHELSON)</code> pour détecter la capacité.</li>
+                <li><strong>Option A — WC2 natif :</strong> session proposal inclut L1 en <code>requiredNamespaces</code> et Michelson en <code>optionalNamespaces</code>. Si le wallet approuve Michelson → session multi-chain établie. <strong>Mapping du handshake Beacon 3 étapes sur WC2 :</strong> l'étape 1 (permission_request v2) est remplacée par la WC2 session proposal — c'est elle qui confirme la liveness du wallet. Les étapes 2 (version_upgrade_request) et 3 (permission_request v3 + networks[]) transitent dans le canal WC2 établi après session. <code>/last-handshake</code> en WC2 retourne donc <code>{ step1: "wc2-session", step2: "acked"|"timeout", step3: "acked"|null, mode: "v2"|"v3" }</code>. <em>Attention :</em> un wallet v3 partial qui approuve seulement L1 donne une session WC2 valid avec length-1 — le dApp doit tester <code>chains.includes(MICHELSON)</code> pour détecter la capacité.</li>
                 <li><strong>Option B — WC2 opaque :</strong> session proposal avec L1 seulement, Beacon v3 en blob opaque dans les messages WC2. Problème : <code>signClient.request({ chainId: MICHELSON_CHAIN_ID })</code> ne peut pas router vers Michelson si ce chain n'est pas dans <code>session.namespaces</code>. Cette option casse le routing WC2 pour les opérations Michelson. <strong>Non viable.</strong></li>
               </ul>
               Option A est la seule option viable. Décision + owner requis avant d'écrire du code Phase 5.
             </li>
-            <li class="block"><strong>Spike pré-Phase 5 requis :</strong> confirmer empiriquement que WC2 fusionne required et optional namespaces sous la même clé <code>tezos</code> dans <code>session.namespaces</code> (vérifier dans la doc Reown / SDK source), et que cette structure est lisible par le dApp SDK. Résoudre avant d'écrire <code>test/phase5.ts</code> — l'assertion <code>chains.includes(MICHELSON)</code> en step 3 dépend directement de cette réponse.</li>
+            <li class="block"><strong>Spike pré-Phase 5 requis :</strong> (1) confirmer empiriquement que WC2 fusionne required et optional namespaces sous la même clé <code>tezos</code> dans <code>session.namespaces</code> (vérifier dans la doc Reown / SDK source), et que cette structure est lisible par le dApp SDK — l'assertion <code>chains.includes(MICHELSON)</code> en step 3 dépend directement de cette réponse ; (2) confirmer le mapping du handshake Beacon 3 étapes sur WC2 : l'étape 1 est remplacée par la WC2 session proposal, les étapes 2–3 transitent dans le canal WC2 — vérifier que <code>version_upgrade_request</code> peut être envoyé comme message WC2 ordinaire après session establishment et que le wallet le reçoit via son handler. Résoudre avant d'écrire <code>test/phase5.ts</code>.</li>
             <li class="q">Does the Reown relay accept a session with two chains in the same <code>tezos</code> namespace?</li>
             <li class="q">Does the WC2 protocol enforce account-per-chain in the session response?</li>
             <li class="q">Any rate limits or relay policy issues with a <code>tezos:</code> namespace for a non-mainnet chain?</li>
@@ -716,8 +716,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <li><strong>Prerequisite:</strong> Reown relay accessible — <code>fetch("https://relay.walletconnect.com/health")</code> resolves with 2xx before the test starts</li>
           <li><code>signClient.connect({ requiredNamespaces, optionalNamespaces })</code> resolves without error ; <code>GET /last-handshake</code> returns <code>{ mode: "v3" }</code> — confirms Beacon v3 protocol (version_upgrade_request + permission_request v3) ran inside the WC2 channel, not just WC2 transport</li>
           <li><code>session.namespaces.tezos.chains</code> contains both <code>tezos:NetXH12Aer3be93</code> and <code>tezos:&lt;MICHELSON_CHAIN_ID&gt;</code> — assert <code>chains.includes(L1_CHAIN_ID) &amp;&amp; chains.includes(MICHELSON_CHAIN_ID)</code>. Note: WC2 fusionne required et optional sous la même clé dans <code>session.namespaces</code> — le wallet patché doit implémenter ce merge dans <code>signClient.approve()</code>. Un wallet headless qui n'approuve que le required produirait length-1 (WC2-valide), donc l'assertion dépend du auto-approve complet.</li>
-          <li><code>signClient.request({ chainId: L1, method: 'tezos_send', ... })</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves</li>
-          <li><code>signClient.request({ chainId: MICHELSON_CHAIN_ID, method: 'tezos_send', ... })</code> → <code>waitForConfirmation(hash, MICHELSON_RPC)</code> resolves</li>
+          <li><code>POST /request-operation</code> with <code>{ network: L1_CHAIN_ID, operationDetails: [...] }</code> → <code>{ transactionHash }</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves — dApp traduit en interne <code>operation_request.network</code> → <code>signClient.request({ chainId: L1_CHAIN_ID })</code></li>
+          <li><code>POST /request-operation</code> with <code>{ network: MICHELSON_CHAIN_ID, operationDetails: [...] }</code> → <code>{ transactionHash }</code> → <code>waitForConfirmation(hash, MICHELSON_RPC)</code> resolves — valide que le routing Beacon <code>operation_request.network</code> → WC2 <code>chainId</code> fonctionne correctement (Objectif 2 + 3)</li>
           <li>No <code>Error</code> or <code>reject</code> response from Reown relay throughout</li>
         </ol>
       </div>
@@ -767,7 +767,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <li>Playwright clicks "Connect" → <code>window.open</code> call observed in browser (no popup blocker in headed Chromium)</li>
           <li>PostMessage handshake logs appear in both windows within 2s</li>
           <li><code>test/phase2.ts</code> assertions all pass via popup transport</li>
-          <li>Popup window stays open across multiple operations in the same session ; fermeture uniquement à la fin de la session. Deux messages distincts dans le protocole popup : <code>{ type: "beacon_operation_done", transactionHash }</code> — envoyé après chaque <code>approveOperationRequest</code>, popup reste ouvert ; <code>{ type: "beacon_done" }</code> — envoyé à la fermeture de session (<code>requestDisconnect()</code> ou session explicitement terminée), dApp appelle <code>popup.close()</code>. Test : après les deux opérations de <code>test/phase2.ts</code>, le dApp émet un disconnect → <code>page.isClosed()</code> returns true.</li>
+          <li>Popup window stays open across multiple operations in the same session ; fermeture uniquement à la fin de la session. Deux messages distincts dans le protocole popup : <code>{ type: "beacon_operation_done", transactionHash }</code> — envoyé après chaque <code>approveOperationRequest</code>, popup reste ouvert ; <code>{ type: "beacon_done" }</code> — envoyé à la fermeture de session (<code>requestDisconnect()</code> ou session explicitement terminée), dApp appelle <code>popupPage.close()</code>. Test Playwright : popup capturé via <code>const popupPage = await context.waitForEvent('page')</code> → après les deux opérations et le disconnect, <code>await popupPage.waitForEvent('close')</code> resolves (pas <code>page.isClosed()</code> qui teste la page principale du dApp, pas le popup).</li>
           <li>Latency measured: time from <code>requestOperation</code> to <code>transactionHash</code> — recorded for comparison with Matrix baseline</li>
         </ol>
       </div>
