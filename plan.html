@@ -428,9 +428,9 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <ul>
             <li>Add <code>networks: NetworkInfo[]</code> to <code>permission_request</code></li>
             <li>Wallet responds with accounts indexed per network in <code>permission_response</code></li>
-            <li><strong>Capability detection via version</strong>: dApp reads <code>version</code> in <code>permission_response</code> — <code>"3"</code> → multi-chain mode active; <code>"2"</code> → legacy wallet, single-network fallback. Version bump is unavoidable for any production protocol change — reusing it as the capability signal adds no extra complexity.</li>
-            <li>Add <code>network: string</code> to <code>operation_request</code> — <strong>required</strong> in multi-chain mode, absent in legacy single-network mode</li>
-            <li>No "primary network" concept — two clean modes, no ambiguity</li>
+            <li><strong>Version negotiation with fallback</strong>: dApp sends <code>version: "3"</code> in <code>permission_request</code>. If wallet responds <code>version: "3"</code> → multi-chain mode active. If wallet responds <code>version: "2"</code> or errors → dApp falls back to single-network legacy mode transparently. Version bump is unavoidable for any production protocol change — reusing it for negotiation adds no extra complexity.</li>
+            <li>Add <code>network: string</code> to <code>operation_request</code> — <strong>required</strong> in multi-chain mode (v3), absent in legacy mode (v2 fallback)</li>
+            <li>No "primary network" concept — two clean modes, explicit version-negotiated</li>
           </ul>
         </div>
         <div class="col-box">
@@ -475,7 +475,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <li><code>requestPermissions({ networks: [L1, Michelson] })</code> → response contains accounts for both chain IDs</li>
           <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves; <code>GET /chains/main/blocks/head/operations/3</code> on L1 RPC contains hash</li>
           <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → wallet routes to Michelson endpoint; <em>note: while using the fake chain ID (<code>tezos:NetXfakechain1111</code>), this validates routing logic only — the RPC endpoint is still L1. Full multi-chain execution on a real separate chain requires the infrastructure fix (Phase 3).</em></li>
-          <li><code>requestOperation({/* no network */})</code> → resolves without error, confirmed on L1 (default)</li>
+          <li><strong>Fallback path</strong>: connect to unpatched wallet (v2 response) → dApp detects version "2", falls back to legacy mode → <code>requestOperation({/* no network */})</code> resolves without error, confirmed on L1</li>
           <li><strong>Backward compat</strong>: repeat test against unpatched <code>@airgap/beacon-wallet</code> → <code>requestPermissions()</code> resolves with single-network account, no exception thrown</li>
         </ol>
       </div>
@@ -520,6 +520,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           </ul>
         </div>
       </div>
+      <div class="blocker"><strong>Blocker:</strong> Phase 3 requires the real Michelson interface chain ID and a dedicated RPC endpoint (infrastructure fix from Phase 0). The fake chain ID used in Phase 2 is insufficient here — on-chain confirmation must land on two distinct networks.</div>
       <div class="outcome"><strong>Phase done when:</strong> Shareable demo recording exists. A wallet engineer watching it understands exactly what they need to implement to support multi-chain sessions.</div>
       <div class="e2e">
         <h4>E2E validation — <code>test/phase3.ts</code> + human review</h4>
@@ -547,7 +548,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Matrix P2P is already the transport from Phase 1. This phase is purely a deployment change: wallet and dApp move from localhost to separate public HTTPS domains (like Umami web vs. a dApp). No protocol or transport change — the goal is to confirm the setup works in a real-world network context and surface any CORS or DoS-protection issues with the Matrix homeserver.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Matrix P2P is already the transport from Phase 1. This phase is purely a deployment change: wallet and dApp move from localhost to separate public HTTPS domains (like Umami web vs. a dApp). The wallet is deployed as a <strong>dev build with headless mode enabled</strong> — making the flow testable by other people without a manual QR scan. No protocol or transport change — the goal is to confirm the setup works in a real-world network context and surface any CORS or DoS-protection issues with the Matrix homeserver.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -610,6 +611,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <div class="col-box">
           <h4>Derisking questions</h4>
           <ul>
+            <li class="q">Does the <code>version: "3"</code> field survive the TZIP-10 → CAIP-25 translation in <code>WalletConnectCommunicationClient</code>? If WC2 wraps the message opaquely, version negotiation carries through; if it translates to native CAIP-25 fields, a WC2-specific capability detection mechanism may be needed.</li>
             <li class="q">Does the Reown relay accept a session with two chains in the same <code>tezos</code> namespace?</li>
             <li class="q">Does the WC2 protocol enforce account-per-chain in the session response?</li>
             <li class="q">Any rate limits or relay policy issues with a <code>tezos:</code> namespace for a non-mainnet chain?</li>
