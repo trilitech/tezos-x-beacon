@@ -204,6 +204,11 @@
       <h3>Protocol change demonstration</h3>
       <p>Show the concrete delta to the Beacon/TZIP-10 protocol — the <code>networks</code> array on <code>permission_request</code>, explicit <code>network</code> routing on <code>operation_request</code> — and prove backward compatibility.</p>
     </div>
+    <div class="obj">
+      <div class="obj-num">Objective 3</div>
+      <h3>Transport coverage</h3>
+      <p>Validate multi-chain sessions across all three Beacon transports (Matrix P2P, WalletConnect v2, PostMessage popup) and in a real cross-domain deployment — confirming the protocol extension is transport-agnostic.</p>
+    </div>
   </div>
 
   <!-- Test network -->
@@ -254,14 +259,13 @@
 
   <div class="two-col" style="margin-bottom:2rem;">
     <div class="col-box">
-      <h4>Headless wallet (<code>HEADLESS=1</code>)</h4>
+      <h4>Headless mode (<code>HEADLESS=1</code>) — both wallet and dApp</h4>
       <ul>
-        <li>Launched with env flag or URL param: <code>?headless=1</code></li>
-        <li>Auto-approves all <code>permission_request</code> and <code>operation_request</code></li>
-        <li>Exposes a control API on <code>http://localhost:&lt;WALLET_PORT&gt;</code> — <strong>dev/test only, never built into production</strong></li>
-        <li><code>GET /pairing-uri</code> — returns the Matrix pairing URI as plain text</li>
-        <li><code>GET /last-op</code> — returns the last <code>transactionHash</code> returned to dApp</li>
-        <li><code>POST /reset</code> — clears session state between tests</li>
+        <li>Launched with env flag or URL param: <code>?headless=1</code> — <strong>dev/test only, never built into production</strong></li>
+        <li>Wallet: auto-approves all <code>permission_request</code> and <code>operation_request</code></li>
+        <li><strong>dApp</strong> exposes: <code>GET /pairing-uri</code> — returns its Matrix pairing URI (dApp-generated, standard Beacon flow); <code>GET /last-op</code> — last <code>transactionHash</code>; <code>POST /reset</code></li>
+        <li><strong>Wallet</strong> exposes: <code>POST /connect</code> — accepts a dApp pairing URI and calls <code>WalletClient.addPeer()</code> programmatically; <code>POST /reset</code></li>
+        <li>⚠ Pairing flow direction to confirm against SDK source before implementing</li>
       </ul>
     </div>
     <div class="col-box">
@@ -278,8 +282,14 @@
   </div>
 
   <pre style="margin-bottom:2rem;"><code><span class="cm">// test/phase1.ts — agent-runnable pattern</span>
-<span class="kw">const</span> <span class="prop">uri</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'http://localhost:5174/pairing-uri'</span>).<span class="fn">then</span>(r => r.<span class="fn">text</span>());
-<span class="kw">await</span> dappClient.<span class="fn">pair</span>(uri);                          <span class="cm">// wallet auto-approves</span>
+<span class="cm">// Pairing flow: dApp generates URI → test runner fetches it → passes to wallet</span>
+<span class="cm">// In standard Beacon Matrix P2P, the dApp generates the pairing URI (its Matrix room +</span>
+<span class="cm">// pubkey); the wallet connects to it. The headless dApp exposes GET /pairing-uri;</span>
+<span class="cm">// the headless wallet exposes POST /connect to accept the URI programmatically.</span>
+<span class="cm">// ⚠ Verify: does WalletClient.addPeer() accept the dApp pairing URI, or is the</span>
+<span class="cm">// flow reversed? Confirm against @airgap/beacon-sdk source before implementing.</span>
+<span class="kw">const</span> <span class="prop">uri</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'http://localhost:5173/pairing-uri'</span>).<span class="fn">then</span>(r => r.<span class="fn">text</span>()); <span class="cm">// dApp</span>
+<span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'http://localhost:5174/connect'</span>, { <span class="prop">method</span>: <span class="str">'POST'</span>, <span class="prop">body</span>: uri }); <span class="cm">// wallet</span>
 <span class="kw">const</span> { <span class="prop">hash</span> } = <span class="kw">await</span> dappClient.<span class="fn">requestOperation</span>({...});
 <span class="kw">await</span> <span class="fn">waitForConfirmation</span>(hash, L1_RPC);               <span class="cm">// poll /chains/main/blocks/head</span>
 <span class="kw">const</span> <span class="prop">op</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`${L1_RPC}/chains/main/blocks/head/operations/3`</span>)
@@ -336,6 +346,7 @@
         </div>
       </div>
       <div class="outcome"><strong>Validation:</strong> <code>curl https://demo.txpark.nomadic-labs.com/rpc/tezlink/chains/main/chain_id</code> returns <code>"NetXH12Aer3be93"</code> ✓ — Michelson interface chain ID to be confirmed separately.</div>
+      <div class="blocker"><strong>Owner needed:</strong> The Michelson interface chain ID bug and dedicated RPC endpoint are "fix in progress" with no identified owner or deadline in this plan. Phase 3 is blocked until this is resolved — identify the responsible team and get a target date.</div>
     </div>
   </div>
 
@@ -363,6 +374,7 @@
             <li><code>dapp/</code> — Vite app, <code>DAppClient</code>, pairing URI + QR code display</li>
             <li>Handles <code>permission_request</code> + <code>operation_request</code> (standard TZIP-10)</li>
             <li>Wallet forges, signs, injects via Taquito on L1 RPC</li>
+            <li>Headless REST API on both wallet and dApp (<code>HEADLESS=1</code>) — implemented in Phase 1, used in all subsequent test phases</li>
           </ul>
         </div>
         <div class="col-box">
