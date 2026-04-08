@@ -264,7 +264,7 @@
         <li>Launched with env flag or URL param: <code>?headless=1</code> — <strong>dev/test only, never built into production</strong></li>
         <li>Wallet: auto-approves all <code>permission_request</code> and <code>operation_request</code></li>
         <li><strong>dApp</strong> exposes: <code>GET /pairing-uri</code> — returns its Matrix pairing URI (dApp-generated, standard Beacon flow); <code>GET /last-op</code> — last <code>transactionHash</code>; <code>POST /reset</code></li>
-        <li><strong>Wallet</strong> exposes: <code>POST /connect</code> — accepts a dApp pairing URI and calls <code>WalletClient.addPeer()</code> programmatically; <code>POST /reset</code></li>
+        <li><strong>Wallet</strong> exposes: <code>POST /connect</code> — accepts a dApp pairing URI and calls <code>WalletClient.addPeer()</code> programmatically; <code>GET /last-network</code> — returns the <code>chainId</code> the wallet used to route the last <code>operation_request</code> (used in Phase 2 to assert routing without on-chain confirmation); <code>POST /reset</code></li>
         <li>⚠ Pairing flow direction to confirm against SDK source before implementing</li>
       </ul>
     </div>
@@ -314,12 +314,12 @@
       <div class="phase-num">0</div>
       <div class="phase-meta">
         <h3>Network prerequisites</h3>
-        <div class="tagline">Chain IDs confirmed — development unblocked</div>
+        <div class="tagline">L1 confirmed — Michelson chain ID known but pending distinct value</div>
         <div class="phase-tags">
           <span class="tag tag-infra">infra</span>
         </div>
       </div>
-      <span class="phase-status st-done">Derisked</span>
+      <span class="phase-status st-progress">In Progress</span>
     </div>
     <div class="phase-body">
       <div class="two-col">
@@ -327,13 +327,13 @@
           <h4>Known chain IDs</h4>
           <ul>
             <li class="check">L1: <code>tezos:NetXH12Aer3be93</code></li>
-            <li class="check">Michelson interface: distinct from L1 (confirmed assumption)</li>
+            <li class="check">Michelson interface: currently <code>tezos:NetXH12Aer3be93</code> — same as L1 (known infrastructure bug: the endpoint proxies to L1 and returns its chain ID)</li>
             <li class="check">EVM interface: <code>eip155:127124</code></li>
           </ul>
           <h4 style="margin-top:1rem;">Pending (infrastructure)</h4>
           <ul>
-            <li class="block">Michelson interface chain ID exact value — known bug, fix in progress</li>
-            <li class="block">Dedicated RPC endpoint for Michelson interface</li>
+            <li class="block">Michelson interface chain ID becoming distinct from L1 — fix in progress</li>
+            <li class="block">Dedicated RPC endpoint for Michelson interface (currently shared with L1)</li>
           </ul>
         </div>
         <div class="col-box">
@@ -382,7 +382,7 @@
           <ul>
             <li class="q">Which Matrix homeserver to use for the POC? (papers.tech, octez.io)</li>
             <li class="q">Does <code>WalletClient</code> pairing via Matrix URI work without extension context?</li>
-            <li class="q">Is <code>@airgap/beacon-wallet</code> the right package, or should we use a fork?</li>
+            <li class="check">SDK fork decided: Phase 2 requires changes to <code>@airgap/beacon-sdk</code> — POC works from a fork from day one</li>
           </ul>
         </div>
       </div>
@@ -407,12 +407,13 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <div class="e2e">
         <h4>E2E validation — <code>test/phase1.ts</code></h4>
         <ol>
-          <li><code>GET /pairing-uri</code> on wallet returns non-empty string</li>
-          <li><code>dappClient.pair(uri)</code> resolves without error</li>
-          <li><code>dappClient.requestPermissions()</code> resolves with <code>publicKey</code> set</li>
+          <li>Fire <code>dappClient.requestPermissions()</code> (async, don't await) — dApp generates pairing URI internally</li>
+          <li><code>GET /pairing-uri</code> on <strong>dApp</strong> returns non-empty URI string</li>
+          <li><code>POST /connect</code> on wallet with URI → wallet calls <code>WalletClient.addPeer()</code>, connects over Matrix, auto-approves</li>
+          <li><code>requestPermissions()</code> resolves with <code>publicKey</code> set</li>
           <li><code>dappClient.requestOperation({ ... 1 μtez transfer })</code> returns <code>transactionHash</code></li>
           <li><code>waitForConfirmation(hash, L1_RPC)</code> resolves within 60s</li>
-          <li><code>GET /chains/main/blocks/head/operations/3</code> contains the hash</li>
+          <li><code>GET /chains/main/blocks/head/operations/3</code> on L1 RPC contains the hash</li>
         </ol>
       </div>
     </div>
@@ -486,9 +487,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <ol>
           <li><code>requestPermissions({ networks: [L1, Michelson] })</code> → response contains accounts for both chain IDs</li>
           <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves; <code>GET /chains/main/blocks/head/operations/3</code> on L1 RPC contains hash</li>
-          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → wallet routes to Michelson endpoint; <em>note: while using the fake chain ID (<code>tezos:NetXfakechain1111</code>), this validates routing logic only — the RPC endpoint is still L1. Full multi-chain execution on a real separate chain requires the infrastructure fix (Phase 3).</em></li>
-          <li><strong>Fallback path</strong>: connect to unpatched wallet (v2 response) → dApp detects version "2", falls back to legacy mode → <code>requestOperation({/* no network */})</code> resolves without error, confirmed on L1</li>
-          <li><strong>Backward compat</strong>: repeat test against unpatched <code>@airgap/beacon-wallet</code> → <code>requestPermissions()</code> resolves with single-network account, no exception thrown</li>
+          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → <code>GET /last-network</code> on wallet returns <code>tezos:NetXfakechain1111</code> — confirms routing decision. <em>On-chain confirmation not used here: both RPCs share the same chain state during Phase 2 (infra bug), so landing on-chain proves nothing about routing.</em></li>
+          <li><strong>Backward compat + fallback</strong>: repeat pairing against stock (unpatched) <code>@airgap/beacon-wallet</code> → <code>requestPermissions()</code> resolves with <code>version: "2"</code>, single-network account, no exception → dApp detects legacy mode → <code>requestOperation({/* no network */})</code> resolves and lands on L1</li>
         </ol>
       </div>
     </div>
@@ -499,8 +499,38 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="phase-header">
       <div class="phase-num">3</div>
       <div class="phase-meta">
+        <h3>Real chain execution — two distinct networks</h3>
+        <div class="tagline">Replace fake chain ID with real Michelson chain ID, confirm on-chain on both RPCs</div>
+        <div class="phase-tags">
+          <span class="tag tag-matrix">Matrix P2P</span>
+          <span class="tag tag-proto">real chains</span>
+        </div>
+      </div>
+      <span class="phase-status st-todo">Not started</span>
+    </div>
+    <div class="phase-body">
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Phase 2 validated routing logic with a fake chain ID on a single shared RPC. This phase replaces the placeholder with the real Michelson interface chain ID and dedicated RPC endpoint, and confirms that two operations in the same session actually land on two distinct chains.</p>
+      <div class="blocker"><strong>Blocker:</strong> Requires the real Michelson interface chain ID and a dedicated RPC endpoint (infrastructure fix from Phase 0). Identify owner and target date before starting.</div>
+      <div class="e2e">
+        <h4>E2E validation — <code>test/phase3.ts</code></h4>
+        <ol>
+          <li><code>test/phase2.ts</code> passes with real chain IDs substituted for the fake placeholder</li>
+          <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashL1, L1_RPC)</code> resolves; operation not found on <code>MICHELSON_RPC</code></li>
+          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashMichelson, MICHELSON_RPC)</code> resolves; operation not found on <code>L1_RPC</code></li>
+          <li><code>GET /last-network</code> returns correct chain ID for each operation</li>
+        </ol>
+      </div>
+      <div class="outcome"><strong>Phase done when:</strong> Two operations in one session land on two distinct chains, confirmed independently on each RPC.</div>
+    </div>
+  </div>
+
+  <!-- Phase 3b -->
+  <div class="phase p3">
+    <div class="phase-header">
+      <div class="phase-num" style="font-size:.7rem;">3b</div>
+      <div class="phase-meta">
         <h3>UX demo — concrete use-case</h3>
-        <div class="tagline">Single session, two operations, two networks — recordable for partners and wallet teams</div>
+        <div class="tagline">Polished UI, screen recording — can run in parallel with Phase 3 using fake chain IDs</div>
         <div class="phase-tags">
           <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-ux">UX demo</span>
@@ -509,7 +539,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Polish the wallet UI and the dApp for a concrete, demo-ready use-case. The goal is a 2-minute screen recording that wallet teams can watch to understand what they need to implement.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Polish the wallet UI and dApp for a concrete demo-ready use-case. UI work can proceed with fake chain IDs; swap to real ones once Phase 3 unblocks. The goal is a 2-minute screen recording that wallet teams can watch to understand exactly what they need to implement.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Use-case</h4>
@@ -525,21 +555,19 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <div class="col-box">
           <h4>Deliverables</h4>
           <ul>
-            <li>Polished wallet UI (network selector, operation preview)</li>
+            <li>Polished wallet UI (network label per operation, approval screen)</li>
             <li>dApp with the concrete use-case flow</li>
-            <li>Screen recording of the full UX</li>
-            <li>Annotations showing the protocol messages exchanged</li>
+            <li>Screen recording ≤ 2 min with protocol message annotations</li>
           </ul>
         </div>
       </div>
-      <div class="blocker"><strong>Blocker:</strong> Phase 3 requires the real Michelson interface chain ID and a dedicated RPC endpoint (infrastructure fix from Phase 0). The fake chain ID used in Phase 2 is insufficient here — on-chain confirmation must land on two distinct networks.</div>
-      <div class="outcome"><strong>Phase done when:</strong> Shareable demo recording exists. A wallet engineer watching it understands exactly what they need to implement to support multi-chain sessions.</div>
+      <div class="outcome"><strong>Phase done when:</strong> Shareable recording exists. A wallet engineer watching it understands what to implement. Swap to real chain IDs before final recording if Phase 3 is complete.</div>
       <div class="e2e">
-        <h4>E2E validation — <code>test/phase3.ts</code> + human review</h4>
+        <h4>Validation — human review</h4>
         <ol>
-          <li><code>test/phase2.ts</code> passes with real chain IDs (not fake placeholder)</li>
-          <li>Both hashes confirmed: <code>waitForConfirmation(hashL1, L1_RPC)</code> and <code>waitForConfirmation(hashMichelson, MICHELSON_RPC)</code></li>
-          <li><strong>Human review</strong>: wallet UI shows correct network label per operation — screen recording produced (≤ 2 min)</li>
+          <li>Wallet UI shows correct network label per operation (L1 vs Michelson interface)</li>
+          <li>Approval screen lists both networks clearly</li>
+          <li>Screen recording produced (≤ 2 min), shareable link available</li>
         </ol>
       </div>
     </div>
@@ -584,8 +612,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <div class="e2e">
         <h4>E2E validation — <code>test/phase4.ts</code></h4>
         <ol>
-          <li><code>GET https://wallet.&lt;domain&gt;/pairing-uri</code> returns non-empty string (headless wallet deployed)</li>
-          <li><code>dappClient.pair(uri)</code> resolves from dApp domain — Matrix pairing over public internet</li>
+          <li><code>GET https://dapp.&lt;domain&gt;/pairing-uri</code> returns non-empty URI string (headless dApp deployed)</li>
+          <li><code>POST https://wallet.&lt;domain&gt;/connect</code> with URI → Matrix pairing completes over public internet</li>
           <li><code>test/phase2.ts</code> assertions all pass against deployed URLs</li>
           <li>Agent inspects browser console logs via Playwright: <strong>zero CORS errors</strong></li>
           <li>Matrix homeserver responds within 5s per message throughout the sequence</li>
@@ -609,6 +637,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
+      <div class="blocker"><strong>Blocker:</strong> E2E step 4 requires a real Michelson RPC endpoint returning a distinct chain ID — same infrastructure dependency as Phase 3.</div>
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
       <div class="two-col">
         <div class="col-box">
@@ -722,6 +751,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="dep"><a href="https://walletconnect.com/sign">@walletconnect/sign-client</a></div>
     <div class="dep">Matrix homeserver (papers.tech or octez.io)</div>
     <div class="dep">Reown relay — Project ID: <code>fb4d4407a8fe167d79bd14b5afcc7230</code></div>
+    <div class="dep">Playwright (Phase 4 CORS detection, Phase 6 popup tests)</div>
     <div class="dep">Previewnet RPC (txpark)</div>
   </div>
 
