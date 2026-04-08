@@ -536,8 +536,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <h4>E2E validation — <code>test/phase3.ts</code></h4>
         <ol>
           <li><code>test/phase2.ts</code> passes with real chain IDs substituted for the fake placeholder</li>
-          <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashL1, L1_RPC)</code> resolves; operation not found on <code>MICHELSON_RPC</code></li>
-          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashMichelson, MICHELSON_RPC)</code> resolves; operation not found on <code>L1_RPC</code></li>
+          <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashL1, L1_RPC)</code> resolves — confirmation on the correct RPC is sufficient proof of routing</li>
+          <li><code>requestOperation({ network: MICHELSON_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashMichelson, MICHELSON_RPC)</code> resolves — confirmation on the correct RPC is sufficient proof of routing</li>
           <li><code>GET /last-rpc-call</code> on wallet returns the correct <code>{ chainId, rpcUrl }</code> for each operation — confirms distinct RPC endpoints were used</li>
         </ol>
       </div>
@@ -662,7 +662,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     </div>
     <div class="phase-body">
       <div class="blocker"><strong>Partial blocker:</strong> Steps 1–3 (WC2 session setup, namespace negotiation, L1 operation) can be validated with the fake chain ID — the Reown relay is content-blind. Step 4 (Michelson on-chain confirmation) requires the real Michelson RPC endpoint and distinct chain ID — same infrastructure dependency as Phase 3.</div>
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. <strong>Architecture test Phase 5 :</strong> le serveur HTTP headless de contrôle (dApp + wallet) tourne inchangé en Phase 5 — WC2 remplace Matrix comme transport de communication Beacon, mais les endpoints headless (<code>POST /request-permissions</code>, <code>POST /request-operation</code>, <code>GET /last-handshake</code>, etc.) restent disponibles pour le test runner HTTP, exactement comme en Phases 1–4. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -670,7 +670,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
             <li>Patch <code>WalletConnectCommunicationClient</code> to include both chains in session proposal</li>
             <li>Extend wallet to handle WC2 session with two <code>tezos:</code> namespaces</li>
             <li>Map <code>operation_request.network</code> → <code>wc_sessionRequest.chainId</code></li>
-            <li>Extend headless mode to auto-approve WC2 session proposals (in addition to Beacon messages) — the wallet must call <code>signClient.approve()</code> automatically when <code>HEADLESS=1</code>. <strong>State-machine coordination required:</strong> WC2 proposals arrive asynchronously via <code>signClient.on('session_proposal', ...)</code>; the wallet must initialize the WC2 SignClient, connect the relay WebSocket, and register the event listener <em>before</em> the test sends <code>signClient.connect()</code>. Solution: wallet exposes <code>POST /wc2-ready</code> that returns 200 only once the SignClient is initialized and listening — the test polls this endpoint (with timeout) before proceeding.</li>
+            <li>Extend headless mode to auto-approve WC2 session proposals (in addition to Beacon messages) — the wallet must call <code>signClient.approve()</code> automatically when <code>HEADLESS=1</code>. <strong>State-machine coordination required:</strong> WC2 proposals arrive asynchronously via <code>signClient.on('session_proposal', ...)</code>; the wallet must initialize the WC2 SignClient, connect the relay WebSocket, and register the event listener <em>before</em> the test sends <code>signClient.connect()</code>. Solution: wallet exposes <code>POST /wc2-ready</code> that returns 200 only once the SignClient is initialized and listening — the test polls this endpoint every 500ms with a 10s timeout before proceeding.</li>
             <li>Validate with Reown relay — Project ID: <code>fb4d4407a8fe167d79bd14b5afcc7230</code></li>
           </ul>
         </div>
@@ -764,7 +764,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <div class="e2e">
         <h4>E2E validation — <code>test/phase6.ts</code> (Playwright)</h4>
         <ol>
-          <li>Playwright clicks "Connect" → <code>window.open</code> call observed in browser (no popup blocker in headed Chromium)</li>
+          <li><strong>Avant de cliquer :</strong> enregistrer le listener popup — <code>const popupPromise = context.waitForEvent('page')</code> — puis Playwright clicks "Connect" → <code>window.open</code> déclenché. <code>const popupPage = await popupPromise</code> capture le popup. L'enregistrement doit précéder le click pour éviter la race condition (event perdu si le popup s'ouvre avant le listener).</li>
           <li>PostMessage handshake logs appear in both windows within 2s</li>
           <li><code>test/phase2.ts</code> assertions all pass via popup transport</li>
           <li>Popup window stays open across multiple operations in the same session ; fermeture uniquement à la fin de la session. Deux messages distincts dans le protocole popup : <code>{ type: "beacon_operation_done", transactionHash }</code> — envoyé après chaque <code>approveOperationRequest</code>, popup reste ouvert ; <code>{ type: "beacon_done" }</code> — envoyé à la fermeture de session (<code>requestDisconnect()</code> ou session explicitement terminée), dApp appelle <code>popupPage.close()</code>. Test Playwright : popup capturé via <code>const popupPage = await context.waitForEvent('page')</code> → après les deux opérations et le disconnect, <code>await popupPage.waitForEvent('close')</code> resolves (pas <code>page.isClosed()</code> qui teste la page principale du dApp, pas le popup).</li>
