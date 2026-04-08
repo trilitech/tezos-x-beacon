@@ -428,7 +428,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <ul>
             <li>Add <code>networks: NetworkInfo[]</code> to <code>permission_request</code></li>
             <li>Wallet responds with accounts indexed per network in <code>permission_response</code></li>
-            <li><strong>Capability detection</strong>: dApp checks if response contains accounts for multiple networks — if yes, multi-chain mode active</li>
+            <li><strong>Capability detection via version</strong>: dApp reads <code>version</code> in <code>permission_response</code> — <code>"3"</code> → multi-chain mode active; <code>"2"</code> → legacy wallet, single-network fallback. Version bump is unavoidable for any production protocol change — reusing it as the capability signal adds no extra complexity.</li>
             <li>Add <code>network: string</code> to <code>operation_request</code> — <strong>required</strong> in multi-chain mode, absent in legacy single-network mode</li>
             <li>No "primary network" concept — two clean modes, no ambiguity</li>
           </ul>
@@ -442,9 +442,10 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           </ul>
         </div>
       </div>
-      <pre><code><span class="cm">// permission_request — extended format</span>
+      <pre><code><span class="cm">// permission_request — v3 extended format</span>
 {
   <span class="prop">type</span>: <span class="str">"permission_request"</span>,
+  <span class="prop">version</span>: <span class="str">"3"</span>,                          <span class="cm">// bumped: signals multi-chain capability</span>
   <span class="prop">network</span>: { <span class="prop">type</span>: <span class="str">"mainnet"</span> },        <span class="cm">// kept for backward compat</span>
   <span class="prop">networks</span>: [                              <span class="cm">// new field</span>
     { <span class="prop">type</span>: <span class="str">"mainnet"</span> },
@@ -455,9 +456,13 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
   <span class="prop">scopes</span>: [<span class="str">"operation_request"</span>]
 }
 
+<span class="cm">// permission_response — dApp reads version to detect mode</span>
+<span class="cm">// version "3" → multi-chain active; version "2" → legacy wallet, fallback</span>
+{ <span class="prop">version</span>: <span class="str">"3"</span>, <span class="prop">accounts</span>: { <span class="str">"tezos:NetXH12Aer3be93"</span>: { <span class="prop">publicKey</span>: <span class="str">"..."</span> }, <span class="str">"tezos:&lt;MICHELSON_CHAIN_ID&gt;"</span>: { <span class="prop">publicKey</span>: <span class="str">"..."</span> } } }
+
 <span class="cm">// operation_request — network required in multi-chain mode</span>
 <span class="kw">await</span> dAppClient.<span class="fn">requestOperation</span>({
-  <span class="prop">network</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span>,   <span class="cm">// required when session is multi-chain</span>
+  <span class="prop">network</span>: <span class="str">"&lt;MICHELSON_CHAIN_ID&gt;"</span>,   <span class="cm">// required when session is multi-chain (v3)</span>
   <span class="prop">operationDetails</span>: [...]
 });
 
