@@ -421,7 +421,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Core protocol change. Extend the Beacon message format, implement on both sides, validate backward compatibility with an unpatched wallet.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Core protocol change. Extend the Beacon message format, implement on both sides, validate backward compatibility with an unpatched wallet. Both <code>@airgap/beacon-dapp</code> and <code>@airgap/beacon-wallet</code> need changes — the POC works from a fork of <code>@airgap/beacon-sdk</code>; monkey-patching a complex SDK is too fragile for multi-phase work.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Protocol delta</h4>
@@ -436,7 +436,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <div class="col-box">
           <h4>Derisking questions</h4>
           <ul>
-            <li class="check">Backward compat (unpatched wallet ignores <code>networks</code>) — validated in Phase 1</li>
+            <li class="check">Backward compat (unpatched wallet ignores <code>networks</code>) — guaranteed by Beacon protocol design: unknown fields must be ignored by conformant implementations</li>
             <li class="q">What happens if the wallet approves only a subset of requested networks?</li>
             <li class="q">Is the <code>network</code> field on <code>operation_request</code> sufficient or does the dApp need a separate per-network client?</li>
           </ul>
@@ -597,7 +597,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in Octez.connect — the TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing. The POC uses the demo wallet to validate the protocol before engaging real wallet teams.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -665,7 +665,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Beacon already has a PostMessage transport for browser extensions. This phase extends that transport to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works without any new transport layer. No new transport is introduced — existing Beacon PostMessage code is extended. This phase validates the pattern and its UX trade-offs compared to Matrix P2P.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Beacon has a PostMessage transport for browser extensions. This phase adapts or extends it to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works between the two pages. If the Beacon SDK already supports popup initialization, this is a small extension; if not, a new transport variant is implemented from scratch in the SDK fork. This phase validates the pattern and its UX trade-offs compared to Matrix P2P.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
