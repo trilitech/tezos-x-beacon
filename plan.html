@@ -292,7 +292,7 @@
     <div class="obj">
       <div class="obj-num">Objective 1</div>
       <h3>UX demonstration</h3>
-      <p>Show what single-session multi-chain UX looks like for a user: one pairing, one approval screen, operations on both L1 and the Michelson interface without re-connecting.</p>
+      <p>Show what single-session multi-chain UX looks like for a user: one pairing, one connection approval screen (covering both chains at once), then operations on both L1 and the Michelson interface without re-connecting.</p>
     </div>
     <div class="obj">
       <div class="obj-num">Objective 2</div>
@@ -316,12 +316,12 @@
         <tr>
           <td>Tezos L1</td>
           <td><code>tezos:NetXH12Aer3be93</code></td>
-          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code></td>
+          <td class="tbd"><code>&lt;L1_SHADOWNET_RPC&gt;</code> — direct L1 node, pending txpark exposure</td>
         </tr>
         <tr>
           <td>Michelson interface</td>
           <td class="tbd"><code>tezos:&lt;MICHELSON_CHAIN_ID&gt;</code> — pending fix</td>
-          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(dedicated endpoint pending)</span> — <em>Phase 2 : <code>rpcUrl</code> dans <code>networks[]</code> pointe vers <code>http://localhost:9998/tezlink</code> (proxy local), pas vers txpark</em></td>
+          <td><code>https://demo.txpark.nomadic-labs.com/rpc/tezlink</code> <span class="tbd">(dedicated endpoint pending)</span></td>
         </tr>
         <tr>
           <td>EVM interface</td>
@@ -359,7 +359,7 @@
       <span class="phase-status st-progress">In Progress</span>
     </div>
     <div class="phase-row-outcome">
-      <strong>Outcome:</strong> L1 chain ID confirmed (<code>tezos:NetXH12Aer3be93</code>). Michelson chain ID pending infrastructure fix. <span class="gate">Gate for Phase 3.</span>
+      <strong>Outcome:</strong> L1 chain ID confirmed (<code>tezos:NetXH12Aer3be93</code>) via direct L1 node. Michelson chain ID and L1 RPC endpoint pending infrastructure. <span class="gate">Gate for Phase 3.</span>
     </div>
   </div>
 
@@ -431,7 +431,7 @@
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-row-outcome">
-      <strong>Outcome:</strong> Screen recording (real chain IDs) shareable with wallet teams. One pairing, one approval, L1 transfer + Michelson contract call in the same session.
+      <strong>Outcome:</strong> Screen recording (real chain IDs) shareable with wallet teams. One pairing, one wallet connection approval (not one signature — the user approves access to both chains at session start), then L1 transfer + Michelson contract call each signed individually.
     </div>
   </div>
 
@@ -631,14 +631,15 @@
         <div class="col-box">
           <h4>Known chain IDs</h4>
           <ul>
-            <li class="check">L1: <code>tezos:NetXH12Aer3be93</code></li>
-            <li class="check">Michelson interface: currently <code>tezos:NetXH12Aer3be93</code> — same as L1 (known infrastructure bug: the endpoint proxies to L1 and returns its chain ID)</li>
+            <li class="check">L1: <code>tezos:NetXH12Aer3be93</code> — must be confirmed via direct L1 node, not tezlink (tezlink currently proxies to L1 due to a bug; once fixed it becomes the Michelson interface)</li>
+            <li class="check">Michelson interface: currently same chain ID as L1 — same bug</li>
             <li class="check">EVM interface: <code>eip155:127124</code></li>
           </ul>
           <h4 style="margin-top:1rem;">Pending (infrastructure)</h4>
           <ul>
+            <li class="block">Direct L1 RPC endpoint not exposed by txpark — required for L1 operations (wallet uses it for Taquito) and for chain ID confirmation</li>
             <li class="block">Michelson interface chain ID becoming distinct from L1 — fix in progress</li>
-            <li class="block">Dedicated RPC endpoint for Michelson interface (currently shared with L1)</li>
+            <li class="block">Dedicated RPC endpoint for Michelson interface (tezlink, once decoupled from L1)</li>
           </ul>
         </div>
         <div class="col-box">
@@ -650,8 +651,8 @@
           </ul>
         </div>
       </div>
-      <div class="outcome"><strong>Validation:</strong> <code>curl https://demo.txpark.nomadic-labs.com/rpc/tezlink/chains/main/chain_id</code> returns <code>"NetXH12Aer3be93"</code> ✓ — Michelson interface chain ID to be confirmed separately.</div>
-      <div class="blocker"><strong>Gate:</strong> Phase 3 cannot start until the Michelson interface chain ID and dedicated RPC endpoint are available. Owner identified — fix in progress.</div>
+      <div class="outcome"><strong>Validation:</strong> <code>curl &lt;L1_SHADOWNET_RPC&gt;/chains/main/chain_id</code> returns <code>"NetXH12Aer3be93"</code> — via the direct L1 node, not tezlink (tezlink currently returns the same value due to the proxy bug, but will return the Michelson chain ID once fixed). Michelson interface chain ID to be confirmed via tezlink once the bug is fixed.</div>
+      <div class="blocker"><strong>Gate:</strong> Phase 1 cannot start without a direct L1 RPC endpoint (txpark needs to expose it — PE says this may require a txpark evolution). Phase 3 additionally requires the Michelson chain ID and dedicated tezlink endpoint.</div>
     </div>
   </div>
 
@@ -693,7 +694,7 @@
       </div>
       <pre><code><span class="cm">// wallet — core pattern</span>
 <span class="kw">const</span> <span class="prop">signer</span> = <span class="kw">await</span> InMemorySigner.<span class="fn">fromSecretKey</span>(<span class="str">'edsk...'</span>);
-<span class="kw">const</span> <span class="prop">Tezos</span> = <span class="kw">new</span> <span class="fn">TezosToolkit</span>(<span class="str">'https://demo.txpark.nomadic-labs.com/rpc/tezlink'</span>);
+<span class="kw">const</span> <span class="prop">Tezos</span> = <span class="kw">new</span> <span class="fn">TezosToolkit</span>(<span class="str">'&lt;L1_SHADOWNET_RPC&gt;'</span>); <span class="cm">// direct L1 node — not tezlink</span>
 Tezos.<span class="fn">setSignerProvider</span>(signer);
 
 <span class="kw">const</span> <span class="prop">client</span> = <span class="kw">new</span> <span class="fn">WalletClient</span>({ <span class="prop">name</span>: <span class="str">"Tezos X Wallet POC"</span> });
@@ -797,7 +798,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
   <span class="prop">network</span>: { <span class="prop">type</span>: <span class="str">"custom"</span>, <span class="prop">chainId</span>: <span class="str">"tezos:NetXH12Aer3be93"</span> }, <span class="cm">// compat parsing uniquement — ignoré par un wallet v3 si networks[] présent</span>
   <span class="prop">networks</span>: [
     { <span class="prop">type</span>: <span class="str">"custom"</span>, <span class="prop">name</span>: <span class="str">"Tezos L1"</span>, <span class="prop">chainId</span>: <span class="str">"tezos:NetXH12Aer3be93"</span>,
-      <span class="prop">rpcUrl</span>: <span class="str">"https://demo.txpark.nomadic-labs.com/rpc/tezlink"</span> },
+      <span class="prop">rpcUrl</span>: <span class="str">"&lt;L1_SHADOWNET_RPC&gt;"</span> },  <span class="cm">// direct L1 node — not tezlink</span>
     { <span class="prop">type</span>: <span class="str">"custom"</span>, <span class="prop">name</span>: <span class="str">"Michelson interface"</span>, <span class="prop">chainId</span>: <span class="str">"tezos:NetXfakechain1111"</span>,
       <span class="prop">rpcUrl</span>: <span class="str">"http://localhost:9998/tezlink"</span> }  <span class="cm">// proxy local Phase 2</span>
   ],
