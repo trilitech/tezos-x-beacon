@@ -1,6 +1,6 @@
-# Tezos X Beacon — Multi-chain POC
+# Tezos X — Octez.connect Multi-chain POC
 
-Proof of concept for extending Beacon (TZIP-10) to support single-session multi-chain operations across Tezos L1 and the Michelson interface of Tezos X.
+Proof of concept for extending Octez.connect (TZIP-10) to support single-session multi-chain operations across Tezos L1 and the Michelson interface of Tezos X.
 
 ## Development plan
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Beacon Multi-chain POC — Development Plan</title>
+  <title>Octez.connect Multi-chain POC — Development Plan</title>
   <style>
     :root {
       --bg: #0F172A; --surface: #1E293B; --surface2: #273548;
@@ -260,8 +260,8 @@
   <span class="badge badge-purple">POC</span>
   <span class="badge badge-amber">In progress</span>
   <span class="badge badge-blue">Tezos X</span>
-  <h1>Beacon Multi-chain — Development Plan</h1>
-  <p>Proof of concept for extending Beacon / Octez.connect to support single-session multi-chain operations across Tezos L1 and the Michelson interface of Tezos X. Covers three transports: PostMessage, Matrix P2P, and WalletConnect v2.</p>
+  <h1>Octez.connect Multi-chain — Development Plan</h1>
+  <p>Proof of concept for extending Octez.connect (TZIP-10) to support single-session multi-chain operations across Tezos L1 and the Michelson interface of Tezos X. Covers three transports: PostMessage, Matrix P2P, and WalletConnect v2.</p>
   <p class="meta">April 2026 &middot; Tezos X Adoption Team</p>
 </header>
 
@@ -281,8 +281,8 @@
   <!-- Context -->
   <div class="context">
     <h2>Context</h2>
-    <p>Beacon (TZIP-10) today supports a single network per session. Tezos X introduces a second runtime — the Michelson interface — that shares the same account model as Tezos L1 but lives on a separate chain. A dApp targeting Tezos X needs to operate on both chains within a single wallet session.</p>
-    <p>This POC validates the required protocol changes to Beacon (TZIP-10) and the wallet-side implementation across all three Beacon transports, on a real dual-runtime previewnet.</p>
+    <p>Octez.connect (TZIP-10) today supports a single network per session. Tezos X introduces a second runtime — the Michelson interface — that shares the same account model as Tezos L1 but lives on a separate chain. A dApp targeting Tezos X needs to operate on both chains within a single wallet session.</p>
+    <p>This POC validates the required protocol changes to Octez.connect (TZIP-10) and the wallet-side implementation across all three Octez.connect transports, on a real dual-runtime previewnet.</p>
     <p>The SDK fork (<code>@airgap/beacon-sdk</code>) used throughout the POC serves as a reference implementation for the TZIP proposal. At POC completion, changes are distilled into a TZIP document and a PR against the upstream SDK. The fork is then archived.</p>
   </div>
 
@@ -297,12 +297,12 @@
     <div class="obj">
       <div class="obj-num">Objective 2</div>
       <h3>Protocol change demonstration</h3>
-      <p>Show the concrete delta to the Beacon/TZIP-10 protocol — optional <code>networks[]</code> on <code>permission_request</code> (response-shape detection, no new message type), explicit <code>network</code> routing on <code>operation_request</code> — and prove backward compatibility.</p>
+      <p>Show the concrete delta to the Octez.connect (TZIP-10) protocol — optional <code>networks[]</code> on <code>permission_request</code> (response-shape detection, no new message type), explicit <code>network</code> routing on <code>operation_request</code> — and prove backward compatibility.</p>
     </div>
     <div class="obj">
       <div class="obj-num">Objective 3</div>
       <h3>Transport coverage</h3>
-      <p>Validate multi-chain sessions across all three Beacon transports (Matrix P2P, WalletConnect v2, PostMessage popup) and in a real cross-domain deployment — confirming the protocol extension is transport-agnostic.</p>
+      <p>Validate multi-chain sessions across all three Octez.connect transports (Matrix P2P, WalletConnect v2, PostMessage popup) and in a real cross-domain deployment — confirming the protocol extension is transport-agnostic.</p>
     </div>
   </div>
 
@@ -779,7 +779,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
             <li class="check">Account model: L1 (shadownet) and Michelson interface (tezlink) share the same Ed25519 key pair — same <code>publicKey</code> appears for both chains in the v3 response. No per-chain key management needed in this POC.</li>
             <li class="q">What does the response look like when the wallet approves only a subset of requested networks?</li>
             <li class="q">Does the dApp need a separate per-network Taquito client, or is the <code>network</code> field on <code>operation_request</code> enough?</li>
-            <li class="q">Session lifecycle: Beacon <code>disconnect</code> tears down the entire session — partial chain revoke is undefined in TZIP-10. Flag in TZIP proposal.</li>
+            <li class="q">Session lifecycle: Octez.connect <code>disconnect</code> tears down the entire session — partial chain revoke is undefined in TZIP-10. Flag in TZIP proposal.</li>
           </ul>
         </div>
       </div>
@@ -899,7 +899,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <li>Wallet UI shows correct network label per operation (L1 vs Michelson interface)</li>
           <li>Approval screen lists both networks clearly</li>
           <li>Screen recording uses real chain IDs (shadownet L1 + tezlink Michelson L2)</li>
-          <li>Protocol message annotations complètes dans la vidéo (chaque message Beacon visible avec son type)</li>
+          <li>Protocol message annotations complètes dans la vidéo (chaque message Octez.connect visible avec son type)</li>
           <li>Checklist validée par au moins un reviewer avant partage externe</li>
         </ol>
       </div>
@@ -968,7 +968,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. <strong>Architecture test Phase 5 :</strong> le serveur HTTP headless de contrôle (dApp + wallet) tourne inchangé en Phase 5 — WC2 remplace Matrix comme transport de communication Beacon, mais les endpoints headless (<code>POST /request-permissions</code>, <code>POST /request-operation</code>, <code>GET /last-handshake</code>, etc.) restent disponibles pour le test runner HTTP, exactement comme en Phases 1–4. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. <strong>Architecture test Phase 5 :</strong> le serveur HTTP headless de contrôle (dApp + wallet) tourne inchangé en Phase 5 — WC2 remplace Matrix comme transport de communication Octez.connect, mais les endpoints headless (<code>POST /request-permissions</code>, <code>POST /request-operation</code>, <code>GET /last-handshake</code>, etc.) restent disponibles pour le test runner HTTP, exactement comme en Phases 1–4. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
       <div class="two-col">
         <div class="col-box">
           <h4>Tasks</h4>
@@ -976,7 +976,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
             <li>Patch <code>WalletConnectCommunicationClient</code> to include both chains in session proposal</li>
             <li>Extend wallet to handle WC2 session with two <code>tezos:</code> namespaces</li>
             <li>Map <code>operation_request.network</code> → <code>wc_sessionRequest.chainId</code></li>
-            <li>Extend headless mode to auto-approve WC2 session proposals (in addition to Beacon messages) — the wallet must call <code>signClient.approve()</code> automatically when <code>HEADLESS=1</code>. <strong>State-machine coordination required:</strong> WC2 proposals arrive asynchronously via <code>signClient.on('session_proposal', ...)</code>; the wallet must initialize the WC2 SignClient, connect the relay WebSocket, and register the event listener <em>before</em> the test sends <code>signClient.connect()</code>. Solution: wallet exposes <code>POST /wc2-ready</code> that returns 200 only once the SignClient is initialized and listening — the test polls this endpoint every 500ms with a 10s timeout before proceeding.</li>
+            <li>Extend headless mode to auto-approve WC2 session proposals (in addition to Octez.connect messages) — the wallet must call <code>signClient.approve()</code> automatically when <code>HEADLESS=1</code>. <strong>State-machine coordination required:</strong> WC2 proposals arrive asynchronously via <code>signClient.on('session_proposal', ...)</code>; the wallet must initialize the WC2 SignClient, connect the relay WebSocket, and register the event listener <em>before</em> the test sends <code>signClient.connect()</code>. Solution: wallet exposes <code>POST /wc2-ready</code> that returns 200 only once the SignClient is initialized and listening — the test polls this endpoint every 500ms with a 10s timeout before proceeding.</li>
             <li>Validate with Reown relay — Project ID: <code>fb4d4407a8fe167d79bd14b5afcc7230</code></li>
           </ul>
         </div>
@@ -990,7 +990,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
             </div>
             <div class="opt-box nope">
               <h5>Option B — opaque (non-viable)</h5>
-              <p>L1-only session proposal, Beacon v3 as opaque blobs. Breaks WC2 routing: <code>signClient.request({chainId: MICHELSON})</code> fails if Michelson is not in <code>session.namespaces</code>.</p>
+              <p>L1-only session proposal, Octez.connect v3 messages as opaque blobs. Breaks WC2 routing: <code>signClient.request({chainId: MICHELSON})</code> fails if Michelson is not in <code>session.namespaces</code>.</p>
             </div>
           </div>
           <h4>Spike before Phase 5</h4>
@@ -1028,7 +1028,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
         <h4>E2E validation — <code>test/phase5.ts</code></h4>
         <ol>
           <li><strong>Prereq:</strong> <code>fetch("https://relay.reown.com/health")</code> returns 2xx. (Reown relay, formerly relay.walletconnect.com — verify the correct health endpoint in Reown SDK docs before implementing.)</li>
-          <li><code>signClient.connect({requiredNamespaces, optionalNamespaces})</code> resolves → poll <code>GET /last-handshake</code> every 500ms (timeout 10s) until <code>{step1:"wc2-session", step2:"acked", step3:"acked", mode:"v3"}</code>. (Beacon v3 exchange — version_upgrade_request + permission_request v3 — runs async inside the WC2 channel after session establishment; may not be complete when <code>connect()</code> resolves.)</li>
+          <li><code>signClient.connect({requiredNamespaces, optionalNamespaces})</code> resolves → poll <code>GET /last-handshake</code> every 500ms (timeout 10s) until <code>{step1:"wc2-session", step2:"acked", step3:"acked", mode:"v3"}</code>. (Octez.connect v3 exchange — permission_request + response-shape detection — runs async inside the WC2 channel after session establishment; may not be complete when <code>connect()</code> resolves.)</li>
           <li><code>session.namespaces.tezos.chains.includes(L1_CHAIN_ID) &amp;&amp; session.namespaces.tezos.chains.includes(MICHELSON_CHAIN_ID)</code> — both chains present.</li>
           <li><strong>L1:</strong> <code>POST /request-operation {network: L1_CHAIN_ID, …}</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves.</li>
           <li><strong>Michelson:</strong> <code>POST /request-operation {network: "tezos:NetXH12Aer3be93", …}</code> → <code>waitForConfirmation(hash, MICHELSON_RPC)</code> resolves.</li>
@@ -1053,7 +1053,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Beacon has a PostMessage transport for browser extensions. This phase adapts or extends it to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works between the two pages. If the Beacon SDK already supports popup initialization, this is a small extension; if not, a new transport variant is implemented from scratch in the SDK fork.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Octez.connect has a PostMessage transport for browser extensions. This phase adapts or extends it to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works between the two pages. If the Octez.connect SDK already supports popup initialization, this is a small extension; if not, a new transport variant is implemented from scratch in the SDK fork.</p>
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:.5rem;"><strong>Test architecture change:</strong> the wallet runs as a popup inside a browser — no standalone HTTP server, so the headless HTTP API (Phases 1–5) doesn't apply. Instead, the wallet auto-approves via <code>?headless=1</code> URL param, and Playwright controls both the dApp page and the popup window directly. No <code>POST /connect</code> needed — the dApp opens the wallet itself via <code>window.open()</code>.</p>
       <div class="two-col">
         <div class="col-box">
@@ -1061,7 +1061,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <ul>
             <li>dApp opens wallet URL via <code>window.open()</code></li>
             <li>Implement PostMessage handshake between opener and popup</li>
-            <li>Route Beacon messages over the popup channel</li>
+            <li>Route Octez.connect messages over the popup channel</li>
             <li>Re-run Phase 2 multi-chain session via popup transport</li>
           </ul>
         </div>
@@ -1069,7 +1069,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <h4>Derisking questions</h4>
           <ul>
             <li class="q">Do popup blockers interfere with <code>window.open()</code> triggered on user action?</li>
-            <li class="q">Is the Beacon SDK popup transport already implemented or does it need to be added?</li>
+            <li class="q">Is the Octez.connect SDK popup transport already implemented or does it need to be added?</li>
             <li class="q">UX comparison: popup vs. QR code — which is more natural for a Tezos web wallet?</li>
           </ul>
         </div>
@@ -1081,7 +1081,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <li>Register popup listener <em>before</em> clicking: <code>const popupPromise = context.waitForEvent('page')</code> → click "Connect" → <code>const popupPage = await popupPromise</code>. Order matters — event is lost if popup opens before listener.</li>
           <li>PostMessage handshake logs appear in both windows within 2s.</li>
           <li>Phase 2 steps 1–4 pass via popup transport (backward compat step excluded — no second HTTP wallet server in popup mode).</li>
-          <li>Popup lifecycle: stays open across operations (<code>beacon_operation_done</code> per op), closes only at session end (<code>beacon_done</code> → dApp calls <code>popupPage.close()</code>). Assert with <code>await popupPage.waitForEvent('close')</code>, not <code>page.isClosed()</code> (that tests the dApp page). <em>Note: <code>beacon_operation_done</code> and <code>beacon_done</code> are Phase 6 popup transport signals sent via PostMessage between the popup and the opener — they are not Beacon/TZIP protocol messages and are not part of the TZIP extension defined in Phase 2.</em></li>
+          <li>Popup lifecycle: stays open across operations (<code>op_done</code> per op), closes only at session end (<code>session_done</code> → dApp calls <code>popupPage.close()</code>). Assert with <code>await popupPage.waitForEvent('close')</code>, not <code>page.isClosed()</code> (that tests the dApp page). <em>Note: <code>op_done</code> and <code>session_done</code> are Phase 6 popup transport signals sent via PostMessage between the popup and the opener — they are not Octez.connect/TZIP protocol messages and are not part of the TZIP extension defined in Phase 2.</em></li>
           <li>Latency from <code>requestOperation</code> to <code>transactionHash</code> recorded for comparison with Matrix baseline.</li>
         </ol>
       </div>
@@ -1092,7 +1092,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
 </div><!-- end tab-details -->
 
 <footer>
-  Tezos X Beacon Multi-chain POC &middot; April 2026 &middot; Internal
+  Tezos X Octez.connect Multi-chain POC &middot; April 2026 &middot; Internal
 </footer>
 
 <script>
