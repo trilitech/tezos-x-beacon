@@ -8,7 +8,7 @@ import {
 import { MemoryStorage } from './storage'
 
 const PORT = parseInt(process.env.PORT ?? '5173')
-const L1_RPC = 'https://rpc.shadownet.teztnets.com'
+const L1_RPC = 'https://octez-shadownet-archive.octez.io'
 
 // ── State ──────────────────────────────────────────────────────────────────
 

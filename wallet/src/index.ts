@@ -15,7 +15,7 @@ const PORT = parseInt(process.env.PORT ?? '5174')
 const WALLET_KEY =
   process.env.WALLET_KEY ??
   'edskRpm2mUhvoUjHjXgMoDRxMKhtKfww1ixmWiHCWhHuMEEbGzdnz8Ks4vgarKDtxok7HmrEo1JzkXkdkvyw7Rtd6k'
-const DEFAULT_RPC = 'https://rpc.shadownet.teztnets.com'
+const DEFAULT_RPC = 'https://octez-shadownet-archive.octez.io'
 
 let lastRpcCall: { chainId: string; rpcUrl: string } | null = null
 
