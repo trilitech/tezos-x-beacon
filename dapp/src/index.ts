@@ -1,3 +1,51 @@
+// Polyfill browser globals for Node.js
+// (SDK accesses window.indexedDB, window.addEventListener, localStorage, BroadcastChannel)
+import 'fake-indexeddb/auto'
+
+if (typeof localStorage === 'undefined') {
+  const _store = new Map<string, string>()
+  ;(globalThis as any).localStorage = {
+    getItem: (k: string) => _store.get(k) ?? null,
+    setItem: (k: string, v: string) => _store.set(k, String(v)),
+    removeItem: (k: string) => _store.delete(k),
+    clear: () => _store.clear(),
+    key: (i: number) => [..._store.keys()][i] ?? null,
+    get length() { return _store.size },
+  }
+}
+
+if (typeof window === 'undefined') {
+  const _listeners: Record<string, Array<(...args: any[]) => void>> = {}
+  ;(globalThis as any).window = {
+    indexedDB: (globalThis as any).indexedDB,
+    localStorage: (globalThis as any).localStorage,
+    navigator: { userAgent: 'node.js' },
+    addEventListener: (type: string, cb: (...args: any[]) => void) => {
+      ;(_listeners[type] ??= []).push(cb)
+    },
+    removeEventListener: (type: string, cb: (...args: any[]) => void) => {
+      _listeners[type] = (_listeners[type] ?? []).filter((l) => l !== cb)
+    },
+    matchMedia: (_query: string) => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+    location: { href: 'http://localhost/' },
+    open: () => null,
+  }
+}
+
+if (typeof BroadcastChannel === 'undefined') {
+  ;(globalThis as any).BroadcastChannel = class {
+    constructor(_name: string) {}
+    postMessage(_data: unknown) {}
+    addEventListener(_type: string, _cb: unknown) {}
+    removeEventListener(_type: string, _cb: unknown) {}
+    close() {}
+  }
+}
+
+if (typeof navigator === 'undefined') {
+  ;(globalThis as any).navigator = { userAgent: 'node.js' }
+}
+
 import express from 'express'
 import {
   DAppClient,
@@ -8,7 +56,7 @@ import {
 import { MemoryStorage } from './storage'
 
 const PORT = parseInt(process.env.PORT ?? '5173')
-const L1_RPC = 'https://rpc.shadownet.teztnets.com'
+const L1_RPC = 'https://octez-shadownet-archive.octez.io'
 
 // ── State ──────────────────────────────────────────────────────────────────
 

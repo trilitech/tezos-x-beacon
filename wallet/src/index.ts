@@ -1,3 +1,16 @@
+// Polyfill localStorage for Node.js (Matrix transport accesses it directly)
+if (typeof localStorage === 'undefined') {
+  const _store = new Map<string, string>()
+  ;(globalThis as any).localStorage = {
+    getItem: (k: string) => _store.get(k) ?? null,
+    setItem: (k: string, v: string) => _store.set(k, String(v)),
+    removeItem: (k: string) => _store.delete(k),
+    clear: () => _store.clear(),
+    key: (i: number) => [..._store.keys()][i] ?? null,
+    get length() { return _store.size },
+  }
+}
+
 import express from 'express'
 import {
   WalletClient,
@@ -14,8 +27,8 @@ const PORT = parseInt(process.env.PORT ?? '5174')
 // Dev key — fund at https://faucet.shadownet.teztnets.com before running phase1 test
 const WALLET_KEY =
   process.env.WALLET_KEY ??
-  'edskRpm2mUhvoUjHjXgMoDRxMKhtKfww1ixmWiHCWhHuMEEbGzdnz8Ks4vgarKDtxok7HmrEo1JzkXkdkvyw7Rtd6k'
-const DEFAULT_RPC = 'https://rpc.shadownet.teztnets.com'
+  'edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq'
+const DEFAULT_RPC = 'https://octez-shadownet-archive.octez.io'
 
 let lastRpcCall: { chainId: string; rpcUrl: string } | null = null
 
