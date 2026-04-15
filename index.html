@@ -838,17 +838,17 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <span class="tag tag-proto">real chains</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-body">
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Phase 2 validated the protocol and routing logic. Phase 3 confirms that operations actually land on-chain on two distinct networks — shadownet (L1) and tezlink (Michelson L2). Both endpoints are available from Phase 0.</p>
       <div class="e2e">
-        <h4>E2E validation — <code>test/phase3.ts</code></h4>
+        <h4>E2E validation — covered by <code>test/phase2.ts</code> ✅</h4>
         <ol>
-          <li><code>test/phase2.ts</code> passes against shadownet (L1) and tezlink (Michelson L2)</li>
-          <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashL1, L1_RPC)</code> resolves — confirmation on the correct RPC is sufficient proof of routing</li>
-          <li><code>requestOperation({ network: "tezos:NetXH12Aer3be93", ... })</code> → <code>waitForConfirmation(hashMichelson, MICHELSON_RPC)</code> resolves — confirmation on the correct RPC is sufficient proof of routing</li>
-          <li><code>GET /last-rpc-call</code> on wallet returns the correct <code>{ chainId, rpcUrl }</code> for each operation — confirms distinct RPC endpoints were used</li>
+          <li><code>test/phase2.ts</code> passes against shadownet (L1) and tezlink (Michelson L2) — no separate <code>test/phase3.ts</code> needed.</li>
+          <li><code>requestOperation({ network: L1_CHAIN_ID, ... })</code> → <code>waitForConfirmation(hashL1, L1_RPC)</code> resolves via head polling (shadownet, <code>monitor/heads</code> not supported).</li>
+          <li><code>requestOperation({ network: "tezos:NetXH12Aer3be93", ... })</code> → confirmed on tezlink via account counter in the wallet before responding. The tezlink protocol does not expose operations in <code>blocks/{id}/operations/{pass}</code> — counter advance is the only inclusion signal.</li>
+          <li><code>GET /last-rpc-call</code> returns correct <code>{ chainId, rpcUrl }</code> for each operation — distinct RPC endpoints confirmed.</li>
         </ol>
       </div>
       <div class="outcome"><strong>Phase done when:</strong> Two operations in one session land on two distinct chains, confirmed independently on each RPC.</div>
@@ -860,8 +860,8 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="phase-header" onclick="toggle(this)">
       <div class="phase-num" style="font-size:.7rem;">3b</div>
       <div class="phase-meta">
-        <h3>UX demo — concrete use-case</h3>
-        <div class="tagline">Polished UI, screen recording — shareable demo for wallet teams</div>
+        <h3>UX demo — browser wallet + dApp (Vite)</h3>
+        <div class="tagline">Real browser apps — dApp in one tab, wallet in another — shareable demo for wallet teams</div>
         <div class="phase-tags">
           <span class="tag tag-matrix">Matrix P2P</span>
           <span class="tag tag-ux">UX demo</span>
@@ -870,37 +870,56 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       <span class="phase-status st-todo">Not started</span>
     </div>
     <div class="phase-body">
-      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Polish the wallet UI and dApp for a concrete demo-ready use-case with real chain IDs. The goal is a 2-minute screen recording that wallet teams can watch to understand exactly what they need to implement.</p>
+      <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Replace the headless Express servers with real Vite browser apps. The wallet runs in one browser tab, the dApp in another (or a popup). The Beacon SDK runs client-side (same as production wallets like Kukai or Temple), so the demo is architecturally honest. First milestone is internal validation; screen recording polish comes later.</p>
       <div class="two-col">
         <div class="col-box">
-          <h4>Use-case</h4>
+          <h4>Architecture</h4>
           <ul>
-            <li>User opens dApp, clicks "Connect"</li>
-            <li>Wallet shows: approve access to L1 <em>and</em> Michelson interface</li>
-            <li>User approves once</li>
-            <li>dApp executes a tez transfer on L1 → wallet signs</li>
-            <li>dApp calls a contract on Michelson interface → wallet signs</li>
-            <li>Both transactions confirmed in the same session</li>
+            <li><code>wc2/wallet/</code> — Vite app: <code>WalletClient</code> in the browser, <code>InMemorySigner</code>, reacts to Beacon messages in real time</li>
+            <li><code>wc2/dapp/</code> — Vite app: <code>DAppClient</code> in the browser, QR code or deep-link pairing, operation buttons</li>
+            <li>PostMessage transport for same-browser testing; Matrix P2P for cross-tab / cross-machine</li>
+            <li>Hard-coded key (same <code>edsk…</code> as phases 1–2) — no key management UI needed for the POC</li>
           </ul>
         </div>
         <div class="col-box">
-          <h4>Deliverables</h4>
+          <h4>Use-case flow</h4>
           <ul>
-            <li>Polished wallet UI (network label per operation, approval screen)</li>
-            <li>dApp with the concrete use-case flow</li>
-            <li>Screen recording ≤ 2 min with protocol message annotations</li>
+            <li>User opens dApp, clicks "Connect" → pairing QR shown</li>
+            <li>Wallet tab scans / reads URI, shows: <em>"Approve access to L1 and Michelson interface?"</em></li>
+            <li>User approves once — both chains granted</li>
+            <li>dApp button "Transfer on L1" → wallet tab shows op details + network label → user signs</li>
+            <li>dApp button "Call contract on Michelson interface" → wallet signs second op on L2</li>
+            <li>Both hashes confirmed in the same session</li>
           </ul>
         </div>
       </div>
-      <div class="outcome"><strong>Phase done when:</strong> Screen recording shareable with wallet teams. A wallet engineer watching it understands what they need to implement.</div>
+      <div class="two-col" style="margin-top:1rem;">
+        <div class="col-box">
+          <h4>Deliverables</h4>
+          <ul>
+            <li><code>wc2/dapp/</code> — Vite dApp with connect + two operation buttons</li>
+            <li><code>wc2/wallet/</code> — Vite wallet with permission approval UI and per-operation signing screen</li>
+            <li>Both apps runnable locally with <code>npm run dev</code></li>
+          </ul>
+        </div>
+        <div class="col-box">
+          <h4>Derisking questions</h4>
+          <ul>
+            <li class="q">Does <code>WalletClient</code> work in a Vite browser context without Node.js polyfills? (IndexedDB, BroadcastChannel — different from Node.js)</li>
+            <li class="q">Which contract on tezlink to call for the L2 operation? Need a deployed FA2 or simple entrypoint.</li>
+            <li class="q">PostMessage transport usable across two Vite dev-server tabs on the same origin?</li>
+          </ul>
+        </div>
+      </div>
+      <div class="outcome"><strong>Phase done when:</strong> A human can open two browser tabs, pair wallet with dApp, sign one L1 transfer and one Michelson L2 contract call, and see both confirmed — without touching the terminal.</div>
       <div class="e2e">
-        <h4>Validation — human review</h4>
+        <h4>Validation — human review (internal first)</h4>
         <ol>
-          <li>Wallet UI shows correct network label per operation (L1 vs Michelson interface)</li>
-          <li>Approval screen lists both networks clearly</li>
-          <li>Screen recording uses real chain IDs (shadownet L1 + tezlink Michelson L2)</li>
-          <li>Protocol message annotations complètes dans la vidéo (chaque message Octez.connect visible avec son type)</li>
-          <li>Checklist validée par au moins un reviewer avant partage externe</li>
+          <li>dApp shows QR / URI for pairing</li>
+          <li>Wallet approval screen lists both networks (L1 + Michelson interface) clearly</li>
+          <li>Per-operation signing screen shows correct network label and operation details</li>
+          <li>L1 transfer hash confirmed on shadownet; L2 contract call hash confirmed on tezlink</li>
+          <li>Full flow works without any terminal interaction</li>
         </ol>
       </div>
     </div>
