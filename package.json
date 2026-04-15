@@ -6,7 +6,8 @@
     "dapp"
   ],
   "scripts": {
-    "test:phase1": "tsx test/phase1.ts"
+    "test:phase1": "tsx test/phase1.ts",
+    "test:phase2": "tsx test/phase2.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

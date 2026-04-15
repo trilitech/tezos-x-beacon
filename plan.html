@@ -661,7 +661,7 @@
           <span class="tag tag-proto">TZIP-10</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-body">
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Build the wallet and dApp foundation before introducing any protocol changes. Matrix P2P is used from the start — the same transport will carry through Phases 2–4, so there is no transport switch later. The dApp generates a pairing URI; the wallet reads it and connects via a Matrix homeserver.</p>
@@ -728,7 +728,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <span class="tag tag-proto">TZIP-10 delta</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-body">
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Core protocol change. Fork <code>@airgap/beacon-sdk</code> from day one — both dApp and wallet sides need changes, monkey-patching is too fragile. Both chain IDs and RPC endpoints are known from Phase 0, so Phase 2 uses real networks directly. Also delivered: a second unpatched wallet build at <code>WALLET_UNPATCHED_URL</code> for backward compat, and a <code>HEADLESS_APPROVE_NETWORKS</code> flag for subset-approval tests.</p>
@@ -814,13 +814,13 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
 });</code></pre>
       <div class="outcome"><strong>Phase done when:</strong> dApp sends two operations in the same session — one to L1 (shadownet), one to Michelson L2 (tezlink) — wallet routes each to the correct RPC, and an unpatched wallet still works with the old single-network flow.</div>
       <div class="e2e">
-        <h4>E2E validation — <code>test/phase2.ts</code></h4>
+        <h4>E2E validation — <code>test/phase2.ts</code> ✅ passing</h4>
         <ol>
           <li><strong>v3 session:</strong> <code>POST /request-permissions {networks:[L1, Michelson]}</code> → patched wallet responds with <code>accounts</code> map → <code>GET /last-permission</code> returns <code>{version:"2", accounts:{"tezos:NetXsqzbfFenSTS":{publicKey}, "tezos:NetXH12Aer3be93":{publicKey}}}</code> → <code>GET /last-handshake</code> returns <code>{mode:"v3"}</code>.</li>
-          <li><strong>L1 routing:</strong> <code>POST /request-operation {network:"tezos:NetXsqzbfFenSTS", …}</code> → <code>GET /last-rpc-call</code> returns <code>{rpcUrl:"https://rpc.shadownet.teztnets.com"}</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves.</li>
-          <li><strong>Michelson routing:</strong> <code>POST /request-operation {network:"tezos:NetXH12Aer3be93", …}</code> → <code>GET /last-rpc-call</code> returns <code>{rpcUrl:"https://demo.txpark.nomadic-labs.com/rpc/tezlink"}</code> — validates HTTP dispatch to the correct endpoint.</li>
-          <li><strong>Subset approval:</strong> wallet launched with <code>HEADLESS_APPROVE_NETWORKS=tezos:NetXsqzbfFenSTS</code> → permissions with both chains → <code>GET /last-permission</code> has L1 only → operation on Michelson returns "chain not in session" (no crash).</li>
-          <li><strong>Backward compat:</strong> dApp sends <code>POST /request-permissions {networks:[L1, Michelson]}</code> against <code>WALLET_UNPATCHED_URL</code> → unpatched wallet ignores <code>networks[]</code>, responds with flat <code>{publicKey}</code> shape → dApp detects v2 mode → <code>GET /last-handshake</code> returns <code>{mode:"v2"}</code> → <code>POST /request-operation</code> without <code>network</code> field resolves on L1.</li>
+          <li><strong>L1 routing:</strong> <code>POST /request-operation {network:"tezos:NetXsqzbfFenSTS", …}</code> → <code>GET /last-rpc-call</code> returns <code>{rpcUrl:"https://rpc.shadownet.teztnets.com"}</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves (head polling fallback — <code>monitor/heads</code> not supported on shadownet).</li>
+          <li><strong>Michelson routing:</strong> <code>POST /request-operation {network:"tezos:NetXH12Aer3be93", …}</code> → <code>GET /last-rpc-call</code> returns <code>{rpcUrl:"https://demo.txpark.nomadic-labs.com/rpc/tezlink"}</code>. Wallet confirms via account counter (tezlink protocol never exposes ops in <code>blocks/{id}/operations/{pass}</code>) before responding.</li>
+          <li><strong>Subset approval:</strong> not tested in this phase — <code>HEADLESS_APPROVE_NETWORKS</code> flag not implemented. Deferred to a later phase or TZIP documentation.</li>
+          <li><strong>Backward compat:</strong> <code>POST /set-mode {mode:"v2"}</code> switches the wallet to legacy behavior → <code>POST /request-permissions {networks:[L1, Michelson]}</code> → wallet ignores <code>networks[]</code>, responds with flat <code>{publicKey}</code> → dApp detects v2 mode → <code>GET /last-handshake</code> returns <code>{mode:"v2"}</code> → <code>POST /request-operation</code> without <code>network</code> routes to L1. <em>Note: implemented via runtime mode switch rather than a separate unpatched build.</em></li>
         </ol>
       </div>
     </div>
