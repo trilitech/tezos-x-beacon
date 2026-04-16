@@ -180,7 +180,9 @@ async function main() {
       addLog(`Paired with ${peerInfo.name ?? 'dApp'}`, 'ok')
     } catch (err: any) {
       console.error('Pairing error:', err)
-      addLog(`Pairing failed: ${err?.message ?? String(err)}`, 'err')
+      const msg = err?.message ?? err?.description ?? err?.errorType
+        ?? (typeof err === 'object' ? JSON.stringify(err) : String(err))
+      addLog(`Pairing failed: ${msg}`, 'err')
     }
   })
 
