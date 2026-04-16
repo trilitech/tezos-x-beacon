@@ -179,7 +179,8 @@ async function main() {
       pairInput.value = ''
       addLog(`Paired with ${peerInfo.name ?? 'dApp'}`, 'ok')
     } catch (err: any) {
-      addLog(`Pairing failed: ${err.message}`, 'err')
+      console.error('Pairing error:', err)
+      addLog(`Pairing failed: ${err?.message ?? String(err)}`, 'err')
     }
   })
 
