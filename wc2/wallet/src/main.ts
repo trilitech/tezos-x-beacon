@@ -284,7 +284,7 @@ async function main() {
               const estimates = await tezos.estimate.batch(ops)
               const opsWithFees = ops.map((op: any, i: number) => ({
                 ...op,
-                fee: Math.ceil((estimates[i]?.suggestedFeeMutez ?? 0) * 3),
+                fee: estimates[i]?.suggestedFeeMutez ?? 0,
                 gasLimit: estimates[i]?.gasLimit,
                 storageLimit: estimates[i]?.storageLimit,
               }))
