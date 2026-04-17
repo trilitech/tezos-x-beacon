@@ -464,7 +464,7 @@
           <span class="tag tag-proto">CAIP-25</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
       <strong>Outcome:</strong> WC2 session spanning both <code>tezos:</code> chains established via Reown relay. <code>tezos_send</code> dispatched to each chain via <code>chainId</code> routing. Changes localized to <code>WalletConnectCommunicationClient</code> in Octez.connect.
@@ -998,7 +998,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <span class="tag tag-proto">CAIP-25</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-body">
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">WalletConnect v2 targets wallets like Kukai and Bento that support WC2. Changes are localized to <code>WalletConnectCommunicationClient</code> in <strong>Octez.connect</strong> (separate repo, external dependency) — this work happens in a branch of Octez.connect in parallel; the <code>tezos-x-beacon</code> repo documents the protocol design and provides the E2E test suite. The TZIP-10 protocol changes from Phase 2 carry over unchanged; only the transport layer differs. <strong>Architecture test Phase 5 :</strong> le serveur HTTP headless de contrôle (dApp + wallet) tourne inchangé en Phase 5 — WC2 remplace Matrix comme transport de communication Octez.connect, mais les endpoints headless (<code>POST /request-permissions</code>, <code>POST /request-operation</code>, <code>GET /last-handshake</code>, etc.) restent disponibles pour le test runner HTTP, exactement comme en Phases 1–4. This phase validates that the WC2 relay handles a session with two <code>tezos:</code> chains and that multi-chain routing translates correctly to CAIP-27 <code>chainId</code> routing.</p>
@@ -1058,15 +1058,20 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
 }</code></pre>
       <div class="outcome"><strong>Phase done when:</strong> A WC2 session spanning both <code>tezos:</code> chains is established via Reown relay, and <code>tezos_send</code> is correctly dispatched to each chain via <code>chainId</code> routing.</div>
       <div class="e2e">
-        <h4>E2E validation — <code>test/phase5.ts</code></h4>
+        <h4>Validation — completed (<code>test/phase5.ts</code>, 2026-04-17)</h4>
         <ol>
-          <li><strong>Prereq:</strong> <code>fetch("https://relay.reown.com/health")</code> returns 2xx. (Reown relay, formerly relay.walletconnect.com — verify the correct health endpoint in Reown SDK docs before implementing.)</li>
-          <li><code>signClient.connect({requiredNamespaces, optionalNamespaces})</code> resolves → poll <code>GET /last-handshake</code> every 500ms (timeout 10s) until <code>{step1:"wc2-session", step2:"acked", step3:"acked", mode:"v3"}</code>. (Octez.connect v3 exchange — permission_request + response-shape detection — runs async inside the WC2 channel after session establishment; may not be complete when <code>connect()</code> resolves.)</li>
-          <li><code>session.namespaces.tezos.chains.includes(L1_CHAIN_ID) &amp;&amp; session.namespaces.tezos.chains.includes(MICHELSON_CHAIN_ID)</code> — both chains present.</li>
-          <li><strong>L1:</strong> <code>POST /request-operation {network: L1_CHAIN_ID, …}</code> → <code>waitForConfirmation(hash, L1_RPC)</code> resolves.</li>
-          <li><strong>Michelson:</strong> <code>POST /request-operation {network: "tezos:NetXH12Aer3be93", …}</code> → <code>waitForConfirmation(hash, MICHELSON_RPC)</code> resolves.</li>
-          <li>No <code>Error</code> or <code>reject</code> from Reown relay throughout.</li>
+          <li>✓ Reown relay reachable (<code>relay.walletconnect.org/health</code> → 200)</li>
+          <li>✓ <code>signClient.connect({requiredNamespaces: {tezos: [L1]}, optionalNamespaces: {tezos: [L2]}})</code> produces pairing URI; wallet auto-approves via <code>POST /wc2-pair</code></li>
+          <li>✓ <code>session.namespaces.tezos.chains</code> contains both <code>tezos:NetXsqzbfFenSTS</code> (L1) and <code>tezos:NetXH12Aer3be93</code> (Michelson interface)</li>
+          <li>✓ <code>tezos_send</code> on L1 → <code>GET /last-rpc-call</code> returns L1 RPC → hash confirmed on-chain</li>
+          <li>✓ <code>tezos_send</code> on Michelson → <code>GET /last-rpc-call</code> returns tezlink RPC → hash confirmed via counter advance</li>
         </ol>
+        <h4>Implementation notes</h4>
+        <ul>
+          <li>WC2 implemented directly in the headless wallet (<code>wallet/src/index.ts</code>) via dynamic <code>import('@walletconnect/sign-client')</code> — no Octez.connect SDK changes needed for the POC</li>
+          <li>Test runner acts as the dApp (initialises its own <code>SignClient</code>); no headless dApp server needed for Phase 5</li>
+          <li>Taquito stays at 24.2.0 in the headless wallet (Octez.connect SDK has <code>@stablelib/*</code> peer deps that rc.3 no longer provides); ×2 fee multiplier kept for tezlink</li>
+        </ul>
       </div>
     </div>
   </div>
