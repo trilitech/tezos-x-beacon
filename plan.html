@@ -1265,8 +1265,12 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
        ═══════════════════════════════════════════════ -->
   <div id="spec-dapp" class="spec-panel active">
 
-    <div class="spec-note" style="margin-bottom:1.5rem;">
+    <div class="spec-note" style="margin-bottom:1rem;">
       <strong>dApp role.</strong> The dApp declares which chains it needs at connection time, detects the wallet's capability from the response, and tags each operation with its target chain ID. Fee estimation is the wallet's responsibility — the dApp sends operation details without fees and the wallet handles the rest.
+    </div>
+
+    <div class="spec-warn" style="margin-bottom:1.5rem;">
+      <strong>SDK extension required.</strong> The Beacon SDK (<code>@airgap/beacon-dapp</code> / <code>@tezos-x/octez.connect-dapp</code>) needs to accept the new parameters natively. The diffs below show the proposed clean API. Until the SDK is updated, these parameters must be injected via an internal workaround — see the POC source (<code>wc2/dapp/src/main.ts</code>) for reference.
     </div>
 
     <!-- Permission flow -->
@@ -1274,39 +1278,37 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
     <div class="diff-grid">
       <div class="diff-col">
         <span class="diff-label before">Before — single chain</span>
-        <pre><code><span class="cm">// Standard requestPermissions()</span>
+        <pre><code><span class="cm">// requestPermissions() with no args</span>
+<span class="cm">// session is bound to the one network</span>
+<span class="cm">// the client was initialised with</span>
 <span class="kw">const</span> result = <span class="kw">await</span> client
   .<span class="fn">requestPermissions</span>()
 
-<span class="cm">// Response always has publicKey;</span>
-<span class="cm">// session is bound to one chain</span>
+<span class="cm">// Response shape:</span>
+<span class="cm">// { publicKey, address, network, … }</span>
 <span class="kw">const</span> pk = result.publicKey</code></pre>
       </div>
       <div class="diff-col">
-        <span class="diff-label after">After — multi-chain</span>
-        <pre><code><span class="cm">// Inject networks[] before the call</span>
-<span class="kw">const</span> orig = client.makeRequest.<span class="fn">bind</span>(client)
-<span class="add"><span class="cm">// ↓ monkey-patch until SDK natively supports it</span>
-client.makeRequest = (req, ...args) => {
-  <span class="kw">if</span> (req?.type === <span class="str">'permission_request'</span>)
-    req.networks = [
-      { chainId: <span class="str">'tezos:NetXsqzbfFenSTS'</span>, rpcUrl: L1_RPC },
-      { chainId: <span class="str">'tezos:NetXH12Aer3be93'</span>, rpcUrl: L2_RPC },
-    ]
-  <span class="kw">return</span> <span class="fn">orig</span>(req, ...args)
-}</span>
-
+        <span class="diff-label after">After — multi-chain (proposed SDK API)</span>
+        <pre><code><span class="cm">// Pass the list of requested chains</span>
 <span class="kw">const</span> result = <span class="kw">await</span> client
-  .<span class="fn">requestPermissions</span>()
-<span class="add">client.makeRequest = orig   <span class="cm">// restore</span></span>
+  .<span class="fn">requestPermissions</span>({
+<span class="add">    networks: [
+      { chainId: <span class="str">'tezos:NetXsqzbfFenSTS'</span>,
+        rpcUrl: L1_RPC, name: <span class="str">'L1'</span> },
+      { chainId: <span class="str">'tezos:NetXH12Aer3be93'</span>,
+        rpcUrl: L2_RPC,
+        name: <span class="str">'Michelson interface'</span> },
+    ],</span>
+  })
 
 <span class="cm">// Detect wallet version from response</span>
 <span class="add"><span class="kw">if</span> (result.accounts) {
-  <span class="cm">// v3 — multi-chain session</span>
+  <span class="cm">// v3 — wallet approved multi-chain</span>
   v3Accounts = result.accounts
   <span class="cm">// { 'tezos:NetX…': { publicKey } }</span>
 } <span class="kw">else</span> {
-  <span class="cm">// v2 — wallet doesn't support multi-chain</span>
+  <span class="cm">// v2 — wallet is single-chain only</span>
   singlePubKey = result.publicKey
 }</span></code></pre>
       </div>
@@ -1317,39 +1319,31 @@ client.makeRequest = (req, ...args) => {
     <div class="diff-grid">
       <div class="diff-col">
         <span class="diff-label before">Before — default network</span>
-        <pre><code><span class="cm">// Routes to the network the client</span>
-<span class="cm">// was initialised with</span>
+        <pre><code><span class="cm">// Routes to the network set at init</span>
 <span class="kw">const</span> result = <span class="kw">await</span> client
   .<span class="fn">requestOperation</span>({
     operationDetails: [
       { kind: <span class="str">'transaction'</span>,
         amount: <span class="str">'1'</span>,
-        destination: DEST }
-    ]
+        destination: DEST },
+    ],
   })</code></pre>
       </div>
       <div class="diff-col">
-        <span class="diff-label after">After — target chain injected</span>
-        <pre><code><span class="cm">// Patch network field per operation</span>
-<span class="kw">const</span> orig = client.makeRequest.<span class="fn">bind</span>(client)
-<span class="add">client.makeRequest = (req, ...args) => {
-  <span class="kw">if</span> (req?.type === <span class="str">'operation_request'</span>)
-    req.network = <span class="str">'tezos:NetXH12Aer3be93'</span>
-  <span class="kw">return</span> <span class="fn">orig</span>(req, ...args)
-}</span>
-
+        <span class="diff-label after">After — target chain explicit (proposed SDK API)</span>
+        <pre><code><span class="cm">// Specify target chain alongside the op</span>
 <span class="kw">const</span> result = <span class="kw">await</span> client
   .<span class="fn">requestOperation</span>({
+<span class="add">    network: <span class="str">'tezos:NetXH12Aer3be93'</span>,  <span class="cm">// CAIP-2</span></span>
     operationDetails: [
       { kind: <span class="str">'transaction'</span>,
         amount: <span class="str">'1'</span>,
-        destination: DEST }
-    ]
+        destination: DEST },
+    ],
   })
-<span class="add">client.makeRequest = orig   <span class="cm">// restore</span></span>
 
-<span class="cm">// result.transactionHash is the op hash</span>
-<span class="cm">// on the chain declared above</span></code></pre>
+<span class="cm">// result.transactionHash — hash on</span>
+<span class="cm">// the chain declared above</span></code></pre>
       </div>
     </div>
 
