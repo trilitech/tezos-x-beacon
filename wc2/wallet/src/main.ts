@@ -150,6 +150,146 @@ function showOperationRequest(
   })
 }
 
+// ── Shared Taquito execution ──────────────────────────────────────────────────
+async function executeOp(
+  signer: InstanceType<typeof InMemorySigner>,
+  rpcUrl: string,
+  ops: any[],
+): Promise<string> {
+  const tezos = new TezosToolkit(rpcUrl)
+  tezos.setSignerProvider(signer)
+  const isL2 = rpcUrl.includes('txpark') || rpcUrl.includes('tezlink')
+
+  if (isL2) {
+    const estimates = await tezos.estimate.batch(ops)
+    const opsWithFees = ops.map((op: any, i: number) => ({
+      ...op,
+      fee: estimates[i]?.suggestedFeeMutez ?? 0,
+      gasLimit: estimates[i]?.gasLimit,
+      storageLimit: estimates[i]?.storageLimit,
+    }))
+    const result = await tezos.contract.batch(opsWithFees).send()
+    const addr = await signer.publicKeyHash()
+    const counterBefore = await tezos.rpc
+      .getContract(addr, { block: 'head' })
+      .then((r) => parseInt(String((r as any).counter ?? -1), 10))
+      .catch(() => -1)
+    if (counterBefore >= 0) {
+      const deadline = Date.now() + 60_000
+      while (Date.now() < deadline) {
+        await new Promise((res) => setTimeout(res, 3_000))
+        const c = await tezos.rpc
+          .getContract(addr, { block: 'head' })
+          .then((r) => parseInt(String((r as any).counter ?? 0), 10))
+          .catch(() => counterBefore)
+        if (c > counterBefore) break
+      }
+    }
+    return result.hash
+  } else {
+    const result = await tezos.contract.batch(ops).send()
+    return result.hash
+  }
+}
+
+// ── Popup mode (Phase 6) ──────────────────────────────────────────────────────
+const PM_TYPE = 'tzip10-popup'
+
+async function runPopupMode(
+  signer: InstanceType<typeof InMemorySigner>,
+  publicKey: string,
+  address: string,
+): Promise<void> {
+  const isHeadless = new URLSearchParams(location.search).has('headless')
+  const opener = window.opener as Window
+  const send = (msg: object) => opener.postMessage(msg, '*')
+
+  let networkRegistry: Record<string, string> = {}
+
+  statusBadge.textContent = 'Popup'
+  addLog('Popup mode — connected to opener', 'ok')
+
+  // Announce ready
+  send({ type: PM_TYPE, action: 'wallet-ready', address })
+
+  window.addEventListener('message', async (event) => {
+    const msg = event.data
+    if (!msg || msg.type !== PM_TYPE) return
+
+    if (msg.action === 'permission-request') {
+      const nets: Array<{ chainId: string; rpcUrl?: string; name?: string }> = msg.networks ?? []
+      const appName: string = msg.appName ?? 'dApp'
+
+      const doApprove = async () => {
+        networkRegistry = {}
+        const accounts: Record<string, { publicKey: string }> = {}
+        for (const n of nets) {
+          accounts[n.chainId] = { publicKey }
+          if (n.rpcUrl) networkRegistry[n.chainId] = n.rpcUrl
+        }
+        send({ type: PM_TYPE, action: 'permission-response', id: msg.id, publicKey, accounts })
+        addLog(`Approved permission for ${appName}`, 'ok')
+      }
+
+      const doReject = async () => {
+        send({ type: PM_TYPE, action: 'permission-error', id: msg.id, errorType: 'ABORTED_ERROR' })
+        addLog('Permission rejected', 'err')
+      }
+
+      if (isHeadless) {
+        await doApprove()
+      } else {
+        showPermissionRequest(appName, nets, doApprove, doReject)
+      }
+    }
+
+    if (msg.action === 'operation-request') {
+      const chainId: string = msg.chainId
+      const rawOps: any[] = msg.operations ?? []
+      // Map Beacon operation format → Taquito batch format
+      const ops = rawOps.map((op: any) => {
+        if (op.kind === 'transaction') {
+          const base: any = {
+            kind: 'transaction' as const,
+            to: op.destination ?? op.to,
+            amount: parseInt(op.amount ?? '0', 10),
+            mutez: true,
+          }
+          if (op.parameters) base.parameter = op.parameters
+          return base
+        }
+        return op
+      })
+      const rpcUrl = rpcForChain(chainId, networkRegistry)
+      const appName: string = msg.appName ?? 'dApp'
+
+      const doApprove = async () => {
+        addLog(`Signing op on ${networkLabel(chainId)}…`)
+        try {
+          const hash = await executeOp(signer, rpcUrl, ops)
+          send({ type: PM_TYPE, action: 'operation-response', id: msg.id, transactionHash: hash })
+          addLog(`✓ ${networkLabel(chainId)}: ${hash.slice(0, 16)}…`, 'ok')
+        } catch (err: any) {
+          const detail = err?.message ?? String(err)
+          send({ type: PM_TYPE, action: 'operation-error', id: msg.id, error: detail })
+          addLog(`✗ ${detail}`, 'err')
+        }
+      }
+
+      const doReject = async () => {
+        send({ type: PM_TYPE, action: 'operation-error', id: msg.id, error: 'ABORTED_ERROR' })
+        addLog('Operation rejected', 'err')
+      }
+
+      if (isHeadless) {
+        await doApprove()
+      } else {
+        showOperationRequest(appName, chainId, ops, doApprove, doReject)
+      }
+    }
+  })
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 async function main() {
   const signer = await InMemorySigner.fromSecretKey(WALLET_KEY)
@@ -157,6 +297,12 @@ async function main() {
   const address   = await signer.publicKeyHash()
 
   accountAddr.textContent = address
+
+  // Popup mode: skip Matrix, use PostMessage transport
+  if (new URLSearchParams(location.search).has('popup') && window.opener) {
+    await runPopupMode(signer, publicKey, address)
+    return
+  }
 
   // Network registry: chainId → rpcUrl (populated from permission_request.networks[])
   let networkRegistry: Record<string, string> = {}
@@ -274,49 +420,13 @@ async function main() {
         async () => {
           addLog(`Signing op on ${networkLabel(chainId)}…`)
           try {
-            const tezos = new TezosToolkit(rpcUrl)
-            tezos.setSignerProvider(signer)
-
-            const isL2 = rpcUrl.includes('txpark') || rpcUrl.includes('tezlink')
-            let result: any
-
-            if (isL2) {
-              const estimates = await tezos.estimate.batch(ops)
-              const opsWithFees = ops.map((op: any, i: number) => ({
-                ...op,
-                fee: estimates[i]?.suggestedFeeMutez ?? 0,
-                gasLimit: estimates[i]?.gasLimit,
-                storageLimit: estimates[i]?.storageLimit,
-              }))
-              result = await tezos.contract.batch(opsWithFees).send()
-
-              // Wait for counter to advance (tezlink protocol doesn't expose ops in block passes)
-              const addr = await signer.publicKeyHash()
-              const counterBefore = await tezos.rpc
-                .getContract(addr, { block: 'head' })
-                .then((r) => parseInt(String((r as any).counter ?? -1), 10))
-                .catch(() => -1)
-              if (counterBefore >= 0) {
-                const deadline = Date.now() + 60_000
-                while (Date.now() < deadline) {
-                  await new Promise((res) => setTimeout(res, 3_000))
-                  const c = await tezos.rpc
-                    .getContract(addr, { block: 'head' })
-                    .then((r) => parseInt(String((r as any).counter ?? 0), 10))
-                    .catch(() => counterBefore)
-                  if (c > counterBefore) break
-                }
-              }
-            } else {
-              result = await tezos.contract.batch(ops).send()
-            }
-
+            const hash = await executeOp(signer, rpcUrl, ops)
             await client.respond({
               type: BeaconMessageType.OperationResponse,
               id: message.id,
-              transactionHash: result.hash,
+              transactionHash: hash,
             } as any)
-            addLog(`✓ ${networkLabel(chainId)}: ${result.hash.slice(0, 16)}…`, 'ok')
+            addLog(`✓ ${networkLabel(chainId)}: ${hash.slice(0, 16)}…`, 'ok')
           } catch (err: any) {
             await client.respond({
               type: BeaconMessageType.Error,

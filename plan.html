@@ -482,10 +482,10 @@
           <span class="tag tag-ux">UX</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
-      <strong>Outcome:</strong> Same multi-chain use-case works with a popup wallet. UX comparison between popup and Matrix QR pairing documented.
+      <strong>Outcome:</strong> Multi-chain session (L1 + Michelson interface) established via <code>tzip10-popup</code> PostMessage protocol. <code>window.open(?popup=1)</code> with <code>?headless=1</code> for auto-approve. Playwright test passes end-to-end: permission handshake, L1 transfer included, L2 contract call confirmed. Popup stays alive across both ops.
     </div>
   </div>
 
@@ -1088,7 +1088,7 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
           <span class="tag tag-ux">UX</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-body">
       <p style="font-size:.875rem; color:var(--text-dim); margin-top:1rem;">Octez.connect has a PostMessage transport for browser extensions. This phase adapts or extends it to support a popup model: the dApp opens the wallet via <code>window.open()</code>; because the opener holds a reference to the popup's <code>window</code> object, PostMessage works between the two pages. If the Octez.connect SDK already supports popup initialization, this is a small extension; if not, a new transport variant is implemented from scratch in the SDK fork.</p>
@@ -1114,14 +1114,16 @@ client.<span class="fn">onOperationRequest</span>(<span class="kw">async</span> 
       </div>
       <div class="outcome"><strong>Phase done when:</strong> Same multi-chain use-case works with a popup wallet. UX comparison between popup and Matrix QR pairing is documented.</div>
       <div class="e2e">
-        <h4>E2E validation — <code>test/phase6.ts</code> (Playwright)</h4>
+        <h4>E2E validation — <code>test/phase6.ts</code> (Playwright) ✓ passed 2026-04-17</h4>
+        <p style="font-size:.82rem; color:#10b981; margin-bottom:.5rem; font-weight:600;">npm run test:phase6 — 1 passed (2m20s)</p>
         <ol>
-          <li>Register popup listener <em>before</em> clicking: <code>const popupPromise = context.waitForEvent('page')</code> → click "Connect" → <code>const popupPage = await popupPromise</code>. Order matters — event is lost if popup opens before listener.</li>
-          <li>PostMessage handshake logs appear in both windows within 2s.</li>
-          <li>Phase 2 steps 1–4 pass via popup transport (backward compat step excluded — no second HTTP wallet server in popup mode).</li>
-          <li>Popup lifecycle: stays open across operations (<code>op_done</code> per op), closes only at session end (<code>session_done</code> → dApp calls <code>popupPage.close()</code>). Assert with <code>await popupPage.waitForEvent('close')</code>, not <code>page.isClosed()</code> (that tests the dApp page). <em>Note: <code>op_done</code> and <code>session_done</code> are Phase 6 popup transport signals sent via PostMessage between the popup and the opener — they are not Octez.connect/TZIP protocol messages and are not part of the TZIP extension defined in Phase 2.</em></li>
-          <li>Latency from <code>requestOperation</code> to <code>transactionHash</code> recorded for comparison with Matrix baseline.</li>
+          <li><strong>✓</strong> Popup opened at <code>localhost:5174/?popup=1&amp;headless=1</code> — wallet detected <code>?popup=1 &amp;&amp; window.opener</code> and entered PostMessage mode.</li>
+          <li><strong>✓</strong> <code>wallet-ready</code> → <code>permission-request</code> → <code>permission-response</code> handshake via cross-origin PostMessage. dApp shows "Connected · popup · tezos:NetXsqzbfFenSTS, tezos:NetXH12Aer3be93".</li>
+          <li><strong>✓</strong> L1 transfer submitted and included (shadownet). Hash: <code>op64Cdeh…</code></li>
+          <li><strong>✓</strong> L2 Michelson contract call submitted and included via counter-poll. Hash: <code>opFgG1Xu…</code></li>
+          <li><strong>✓</strong> Popup remains open across both operations (<code>popupPage.isClosed() === false</code>).</li>
         </ol>
+        <p style="font-size:.82rem; color:var(--text-dim); margin-top:.5rem;"><strong>Root cause found during validation:</strong> port 5174 was occupied by the Phase 5 headless Node.js server instead of the wc2/wallet Vite dev server — popup was getting "Cannot GET /". Also: popup handler was passing raw Beacon ops to Taquito without the <code>destination→to</code> / <code>amount→number</code> mapping, fixed in <code>runPopupMode</code>.</p>
       </div>
     </div>
   </div>

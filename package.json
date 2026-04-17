@@ -8,9 +8,11 @@
   "scripts": {
     "test:phase1": "tsx test/phase1.ts",
     "test:phase2": "tsx test/phase2.ts",
-    "test:phase5": "tsx test/phase5.ts"
+    "test:phase5": "tsx test/phase5.ts",
+    "test:phase6": "playwright test test/phase6.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   },
