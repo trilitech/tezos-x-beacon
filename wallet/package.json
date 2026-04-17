@@ -7,9 +7,10 @@
     "start:unpatched": "HEADLESS=1 UNPATCHED=1 tsx src/index.ts"
   },
   "dependencies": {
-    "@tezos-x/octez.connect-wallet": "4.8.3",
-    "@taquito/taquito": "^24.2.0",
     "@taquito/signer": "^24.2.0",
+    "@taquito/taquito": "^24.2.0",
+    "@tezos-x/octez.connect-wallet": "4.8.3",
+    "@walletconnect/sign-client": "^2.18.0",
     "express": "^4.21.2"
   },
   "devDependencies": {

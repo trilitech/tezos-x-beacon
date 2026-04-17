@@ -24,6 +24,11 @@ import { MemoryStorage } from './storage'
 
 const PORT = parseInt(process.env.PORT ?? '5174')
 
+const WC2_PROJECT_ID = 'fb4d4407a8fe167d79bd14b5afcc7230'
+const L2_CHAIN  = 'tezos:NetXH12Aer3be93'
+const L1_RPC    = 'https://rpc.shadownet.teztnets.com'
+const L2_RPC    = 'https://demo.txpark.nomadic-labs.com/rpc/tezlink'
+
 // Suppress SDK-internal crashes so the Express server stays alive.
 // The "unload" library (imported by broadcast-channel which is used by octez.connect-wallet)
 // registers an uncaughtException handler that calls process.exit(101) for ANY error.
@@ -77,9 +82,144 @@ let networkRegistry: Record<string, string> = {}
 
 let lastRpcCall: { chainId: string; rpcUrl: string } | null = null
 
+// ── WC2 state ─────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let wc2Client: any = null
+let wc2Ready = false
+
+function rpcForChain(chainId: string): string {
+  if (networkRegistry[chainId]) return networkRegistry[chainId]
+  return chainId === L2_CHAIN ? L2_RPC : L1_RPC
+}
+
+async function executeOps(
+  signer: InMemorySigner,
+  rpcUrl: string,
+  operations: any[],
+): Promise<string> {
+  const tezos = new TezosToolkit(rpcUrl)
+  tezos.setSignerProvider(signer)
+
+  const isL2 = rpcUrl.includes('txpark') || rpcUrl.includes('tezlink')
+  const ops = operations.map((op: any) => {
+    if (op.kind === 'transaction') {
+      return { kind: 'transaction' as const, to: op.destination, amount: parseInt(op.amount, 10), mutez: true }
+    }
+    return op
+  })
+
+  if (isL2) {
+    const estimates = await tezos.estimate.batch(ops)
+    const opsWithFees = ops.map((op: any, i: number) => ({
+      ...op,
+      // ×2 safety margin: Taquito 24.2.0 underestimates fees on tezlink
+      fee: Math.ceil((estimates[i]?.suggestedFeeMutez ?? 0) * 2),
+      gasLimit: Math.ceil((estimates[i]?.gasLimit ?? 1000) * 1.5),
+      storageLimit: estimates[i]?.storageLimit ?? 257,
+    }))
+    const result = await tezos.contract.batch(opsWithFees).send()
+
+    const addr = await signer.publicKeyHash()
+    const counterBefore = await tezos.rpc
+      .getContract(addr, { block: 'head' })
+      .then((r) => parseInt(String((r as any).counter ?? -1), 10))
+      .catch(() => -1)
+    if (counterBefore >= 0) {
+      await new Promise<void>((resolve) => {
+        const deadline = setTimeout(resolve, 60_000)
+        const poll = setInterval(async () => {
+          const c = await tezos.rpc
+            .getContract(addr, { block: 'head' })
+            .then((r) => parseInt(String((r as any).counter ?? 0), 10))
+            .catch(() => counterBefore)
+          if (c > counterBefore) { clearInterval(poll); clearTimeout(deadline); resolve() }
+        }, 3_000)
+      })
+    }
+    return result.hash
+  } else {
+    const result = await tezos.contract.batch(ops).send()
+    return result.hash
+  }
+}
+
+async function initWC2(signer: InMemorySigner): Promise<void> {
+  const { SignClient } = await import('@walletconnect/sign-client')
+  wc2Client = await SignClient.init({
+    projectId: WC2_PROJECT_ID,
+    metadata: {
+      name: 'Tezos X Wallet POC',
+      description: 'Multi-chain wallet POC',
+      url: 'https://trilitech.github.io/tezos-x-octez-connect/wallet/',
+      icons: [],
+    },
+  })
+
+  wc2Client.on('session_proposal', async ({ id, params }: any) => {
+    try {
+      const reqChains  = params.requiredNamespaces?.tezos?.chains ?? []
+      const optChains  = params.optionalNamespaces?.tezos?.chains ?? []
+      const allChains  = [...new Set([...reqChains, ...optChains])]
+      const walletAddr = await signer.publicKeyHash()
+      const accounts   = allChains.map((c: string) => `${c}:${walletAddr}`)
+
+      const { acknowledged } = await wc2Client!.approve({
+        id,
+        namespaces: {
+          tezos: {
+            chains: allChains,
+            methods: ['tezos_getAccounts', 'tezos_send', 'tezos_sign'],
+            events: [],
+            accounts,
+          },
+        },
+      })
+      await acknowledged()
+      console.log('[wc2] session approved, chains:', allChains)
+    } catch (err: any) {
+      console.error('[wc2] session_proposal error:', err.message)
+    }
+  })
+
+  wc2Client.on('session_request', async ({ topic, id, params }: any) => {
+    const { chainId, request } = params
+    if (request.method !== 'tezos_send') {
+      await wc2Client!.respond({
+        topic,
+        response: { id, jsonrpc: '2.0', error: { code: -32601, message: 'Method not supported' } },
+      })
+      return
+    }
+    const rpcUrl = rpcForChain(chainId)
+    lastRpcCall = { chainId, rpcUrl }
+    console.log(`[wc2] tezos_send on ${chainId} via ${rpcUrl}`)
+    try {
+      const ops = request.params?.operations ?? []
+      const hash = await executeOps(signer, rpcUrl, ops)
+      await wc2Client!.respond({
+        topic,
+        response: { id, jsonrpc: '2.0', result: { transactionHash: hash } },
+      })
+      console.log(`[wc2] hash: ${hash}`)
+    } catch (err: any) {
+      console.error('[wc2] tezos_send error:', err.message)
+      await wc2Client!.respond({
+        topic,
+        response: { id, jsonrpc: '2.0', error: { code: -32000, message: err.message } },
+      })
+    }
+  })
+
+  wc2Ready = true
+  console.log('[wc2] SignClient ready')
+}
+
 async function main(): Promise<void> {
   const signer = await InMemorySigner.fromSecretKey(WALLET_KEY)
   const publicKey = await signer.publicKey()
+
+  // Start WC2 in the background — don't await so the Matrix wallet also starts
+  initWC2(signer).catch((err) => console.error('[wc2] init error:', err.message))
 
   const client = new WalletClient({
     name: 'Tezos X Wallet POC',
@@ -247,9 +387,23 @@ async function main(): Promise<void> {
     else res.status(400).json({ error: 'mode must be "v2" or "v3"' })
   })
 
-  // POST /wc2-ready — Phase 5 stub (always 200 for now)
-  app.post('/wc2-ready', (_req, res) => {
-    res.sendStatus(200)
+  // GET /wc2-ready — 200 once WC2 SignClient is initialized and listening
+  app.get('/wc2-ready', (_req, res) => {
+    res.sendStatus(wc2Ready ? 200 : 503)
+  })
+
+  // POST /wc2-pair — receive WC2 pairing URI from test, pair with dApp SignClient
+  app.post('/wc2-pair', async (req, res) => {
+    const { uri } = req.body ?? {}
+    if (!uri) { res.status(400).json({ error: 'uri required' }); return }
+    if (!wc2Client) { res.status(503).json({ error: 'WC2 not ready' }); return }
+    try {
+      await wc2Client.pair({ uri })
+      res.sendStatus(200)
+    } catch (err: any) {
+      console.error('[wc2] pair error:', err.message)
+      res.status(500).json({ error: err.message })
+    }
   })
 
   // GET /account — sender address (derived from WALLET_KEY)
