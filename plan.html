@@ -112,6 +112,7 @@
     .st-prereq   { background: #451A03; color: var(--amber); }
     .st-progress { background: #1E3A5F; color: var(--blue); }
     .st-done     { background: #064E3B; color: var(--green); }
+    .st-skip     { background: #1C1917; color: var(--text-dim); border: 1px solid var(--border); text-decoration: line-through; }
 
     .phase-body { padding: 0 1.5rem 1.5rem; border-top: 1px solid var(--border); }
 
@@ -484,7 +485,7 @@
           <span class="tag tag-proto">TZIP-10</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
       <strong>Outcome:</strong> dApp pairs with wallet over Matrix, sends a tez transfer on L1, wallet signs and injects, operation confirmed on txpark. Headless REST API in place for all subsequent test phases.
@@ -502,7 +503,7 @@
           <span class="tag tag-proto">TZIP-10 delta</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
       <strong>Outcome:</strong> dApp sends two operations in one session — one to L1 (shadownet), one to Michelson L2 (tezlink) — wallet routes each to the correct RPC. Backward compatibility with unpatched wallet proven via response-shape detection (no timeout, no new message type).
@@ -520,7 +521,7 @@
           <span class="tag tag-proto">real chains</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
       <strong>Outcome:</strong> Two operations in one session land on two distinct chains, confirmed independently on each RPC. <span class="gate">Blocked on Michelson infrastructure fix (Phase 0).</span>
@@ -538,7 +539,7 @@
           <span class="tag tag-ux">UX demo</span>
         </div>
       </div>
-      <span class="phase-status st-todo">Not started</span>
+      <span class="phase-status st-done">Done</span>
     </div>
     <div class="phase-row-outcome">
       <strong>Outcome:</strong> Screen recording (real chain IDs) shareable with wallet teams. One pairing, one wallet connection approval (not one signature — the user approves access to both chains at session start), then L1 transfer + Michelson contract call each signed individually.
