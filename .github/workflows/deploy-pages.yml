@@ -12,28 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Build dApp
+      - name: Prepare site
         run: |
-          cd wc2/dapp
-          npm ci
-          npm run build -- --base=/tezos-x-octez-connect/dapp/
-          mkdir -p ../../_site/dapp
-          cp -r dist/. ../../_site/dapp/
-
-      - name: Build wallet
-        run: |
-          cd wc2/wallet
-          npm ci
-          npm run build -- --base=/tezos-x-octez-connect/wallet/
-          mkdir -p ../../_site/wallet
-          cp -r dist/. ../../_site/wallet/
-
-      - name: Copy plan as index
-        run: cp plan.html _site/index.html
+          mkdir -p _site
+          cp plan.html _site/index.html
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
