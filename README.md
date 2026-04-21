@@ -10,7 +10,8 @@ All six phases validated and done. The POC demonstrates a full multi-chain sessi
 
 | Document | Description |
 |---|---|
-| [Development plan](https://trilitech.github.io/tezos-x-octez-connect/) | Phase-by-phase plan with protocol spec and wallet integration guide |
+| [Proposal](https://trilitech.github.io/tezos-x-octez-connect/) | TZIP-10 extension for multi-chain sessions — problem, proposal, integration, demo |
+| [PoC planning and execution](https://trilitech.github.io/tezos-x-octez-connect/poc-plan.html) | Phase-by-phase plan, technical details, and test infrastructure |
 | [Wallet integration guide](docs/wallet-multichain-integration.md) | How to extend a Chrome extension or standalone wallet for multi-chain TZIP-10 |
 
 ## Repo structure

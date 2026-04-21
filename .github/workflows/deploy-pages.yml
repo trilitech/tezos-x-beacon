@@ -15,7 +15,9 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp plan.html _site/index.html
+          cp proposal.html _site/index.html
+          cp poc-plan.html _site/poc-plan.html
+          cp demo.webm _site/demo.webm
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
